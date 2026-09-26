@@ -81,7 +81,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'd0cd5b428d94eb3db6b626e7a81161902fe1fcd6'" .github/workflows/build-nro.yml
+grep -q "github.event.before == 'b6b8b820a8846e021e9a8f5fca194339c47b1cc8'" .github/workflows/build-nro.yml
+! grep -q 'd0cd5b428d94eb3db6b626e7a81161902fe1fcd6' .github/workflows/build-nro.yml
 ! grep -q '2aaad5171cd154e7b89bb16b7b4d4f9cea340bb5' .github/workflows/build-nro.yml
 ! grep -q '7d6b77d4ee8844643242ae65fe415563898878fb' .github/workflows/build-nro.yml
 ! grep -q 'd3e2c76b97d86c6578386fccddf212dcfb88ff05' .github/workflows/build-nro.yml
@@ -112,7 +113,7 @@ grep -q 'content_id_match=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl
 grep -q 'entry_sha256=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
 grep -q 'table_bounds=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
 grep -q 'table_overlap=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
-grep -q 'not_applicable_compressed' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'not_applicable_compressed' source/atmo_xl/include/install/source_entry_audit.hpp
 grep -q 'source_audit=\[%s\]' source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
 grep -q 'Put the verdict first' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
 grep -q 'throw_formatted_error' source/atmo_xl/include/util/error.hpp

@@ -1,5 +1,11 @@
 # AstraNAS 更新记录
 
+## v1.0.7
+
+- 修正 v1.0.6 host regression 的旧路径假设：`not_applicable_compressed` 已迁移到共享 `source_entry_audit.hpp`，测试门禁同步指向新的唯一实现位置。
+- 不改动 CNMT 源包不一致分类逻辑、安装安全校验或用户错误文本；重新执行完整 host regression、Switch build 和 Artifact 验收。
+- 版本同步为 1.0.7，并为本次 main 修复提交设置一次性 GitHub-hosted 构建门禁。
+
 ## v1.0.6
 
 - CNMT source audit 改为结构化结果，明确区分 Content-ID match/mismatch/not-applicable/unavailable 与 bounds/overlap 状态。
