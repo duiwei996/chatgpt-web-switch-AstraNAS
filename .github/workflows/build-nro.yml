@@ -1,0 +1,83 @@
+name: Build AstraNAS NRO
+
+on:
+  # Run the first public build for the clean 1.0.0 root; later main pushes stay manual.
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: astranas-manual-build
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  ASTRANAS_VERSION: "1.0.0"
+  LIBSMB2_COMMIT: "0b2aa4310c7a0510c666fe7da0eebce0f7e93824"
+  LIBUSBHSFS_COMMIT: "3b897ed6a79c910aa3f13693f17b80afb802b3b5"
+  TOOLCHAIN_BRIDGE_REPO: "duiwei996/chatgpt-web-github-actions-DownloadBridge"
+  TOOLCHAIN_BRIDGE_TAG: "astranas-devkitpro-v1"
+  TOOLCHAIN_ARCHIVE_SHA256: "af4ec72ba7c20b7aedc79f5d63bffa842e2665e740a878cc78c13d34051791b9"
+
+jobs:
+  host-test:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, '初始公开版本 1.0.0')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Install host test dependencies
+        run: sudo apt-get update && sudo apt-get install -y g++ libcurl4-openssl-dev libjson-c-dev pkg-config
+      - name: Run host regression tests
+        run: ./scripts/run_host_tests.sh
+
+  build:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, '初始公开版本 1.0.0')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Verify version
+        run: |
+          set -euo pipefail
+          grep -q "project(astranas VERSION ${ASTRANAS_VERSION} LANGUAGES C CXX)" CMakeLists.txt
+          grep -q "kVersion = \"${ASTRANAS_VERSION}\"" source/app/constants.hpp
+          python3 scripts/check_version.py --require-parent-bump --initial-version 1.0.0
+      - name: Restore pinned toolchain archive cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/astranas
+          key: astranas-devkitpro-v1-${{ env.TOOLCHAIN_ARCHIVE_SHA256 }}
+      - name: Prepare DownloadBridge toolchain
+        env:
+          ASTRANAS_TOOLCHAIN_REPO: ${{ env.TOOLCHAIN_BRIDGE_REPO }}
+          ASTRANAS_TOOLCHAIN_TAG: ${{ env.TOOLCHAIN_BRIDGE_TAG }}
+          ASTRANAS_TOOLCHAIN_SHA256: ${{ env.TOOLCHAIN_ARCHIVE_SHA256 }}
+          ASTRANAS_TOOLCHAIN_FORCE_BUNDLE: "1"
+          ASTRANAS_TOOLCHAIN_FETCH_METADATA: "1"
+        run: ./scripts/prepare_devkitpro_from_bridge.sh
+      - name: Build both NROs
+        run: |
+          set -euo pipefail
+          ./scripts/build_switch.sh
+          test -s dist/switch/AstraNAS/AstraNAS.nro
+          test -s dist/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
+          python3 scripts/check_nro_bundle.py dist "$ASTRANAS_VERSION"
+          sha256sum dist/switch/AstraNAS/AstraNAS.nro dist/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro > dist/NRO-SHA256SUMS.txt
+      - name: Upload NRO artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: AstraNAS-v${{ env.ASTRANAS_VERSION }}-${{ github.sha }}
+          path: |
+            dist/switch/AstraNAS/AstraNAS.nro
+            dist/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
+            dist/NRO-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 1
