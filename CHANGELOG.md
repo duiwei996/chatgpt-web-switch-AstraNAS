@@ -1,5 +1,13 @@
 # AstraNAS 更新记录
 
+## v1.0.6
+
+- CNMT source audit 改为结构化结果，明确区分 Content-ID match/mismatch/not-applicable/unavailable 与 bounds/overlap 状态。
+- 只有未压缩 CNMT 完整 entry 的 Content ID 不匹配、目标和整个容器表均未越界且不存在 entry overlap 时，才输出“安装包 CNMT 内容与 Content ID 不一致”的友好错误。
+- 友好错误直接携带文件名、期望 Content ID、实际 SHA-256 和完整 source audit，并提示重新获取、复制或打包安装包。
+- 其他 header、布局、压缩或审计异常继续保留原始诊断，不误分类；安装校验和成功条件不变。
+- 新增 source-entry audit host regression，并同步 1.0.6 版本与一次性 main 构建门禁。
+
 ## v1.0.5
 
 - 修复 `THROW_FORMAT` 640 字节固定 payload 在多层异常包装时静默截断 source audit 尾部的问题，改为动态长度格式化。

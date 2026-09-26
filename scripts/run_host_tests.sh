@@ -81,7 +81,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == '2aaad5171cd154e7b89bb16b7b4d4f9cea340bb5'" .github/workflows/build-nro.yml
+grep -q "github.event.before == 'd0cd5b428d94eb3db6b626e7a81161902fe1fcd6'" .github/workflows/build-nro.yml
+! grep -q '2aaad5171cd154e7b89bb16b7b4d4f9cea340bb5' .github/workflows/build-nro.yml
 ! grep -q '7d6b77d4ee8844643242ae65fe415563898878fb' .github/workflows/build-nro.yml
 ! grep -q 'd3e2c76b97d86c6578386fccddf212dcfb88ff05' .github/workflows/build-nro.yml
 ! grep -q '44c7d5cf4f3ad4b804517539c2f5c6bef0bc6a5d' .github/workflows/build-nro.yml
@@ -118,6 +119,10 @@ grep -q 'throw_formatted_error' source/atmo_xl/include/util/error.hpp
 ! grep -q 'formatted_msg\[640\]' source/atmo_xl/include/util/error.hpp
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/error_format_test.cpp -Isource/atmo_xl/include -o /tmp/AstraNAS-error-format-test
 /tmp/AstraNAS-error-format-test
+grep -q 'provesContentIdMismatch' source/atmo_xl/include/install/source_entry_audit.hpp source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
+grep -q '安装包 CNMT 内容与 Content ID 不一致' source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
+"$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/source_entry_audit_test.cpp -Isource/atmo_xl/include -o /tmp/AstraNAS-source-entry-audit-test
+/tmp/AstraNAS-source-entry-audit-test
 grep -q 'add_source_read' source/atmo_xl/source/install/sdmc_nsp.cpp source/atmo_xl/source/install/sdmc_xci.cpp
 grep -q 'AstraNAS-source.zip' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -q 'BUILD-MANIFEST.txt' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml

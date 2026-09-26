@@ -28,6 +28,7 @@ SOFTWARE.
 
 #include <switch/types.h>
 #include "install/pfs0.hpp"
+#include "install/source_entry_audit.hpp"
 #include "nx/ncm.hpp"
 #include "util/network_util.hpp"
 
@@ -58,9 +59,10 @@ namespace tin::install::nsp
             virtual const PFS0BaseHeader* GetBaseHeader();
             virtual u64 GetDataOffset();
             virtual u64 GetSourceSize() const = 0;
-            virtual std::string AuditFileEntry(const PFS0FileEntry* fileEntry,
-                                               const NcmContentId& expectedContentId,
-                                               bool compareContentId);
+            virtual tin::install::SourceEntryAudit AuditFileEntry(
+                const PFS0FileEntry* fileEntry,
+                const NcmContentId& expectedContentId,
+                bool compareContentId);
 
             virtual const PFS0FileEntry* GetFileEntry(unsigned int index);
             virtual const PFS0FileEntry* GetFileEntryByName(std::string name);

@@ -229,9 +229,10 @@ namespace tin::install::xci
         return checked_file_name(header, fileEntry);
     }
 
-    std::string XCI::AuditFileEntry(const HFS0FileEntry* fileEntry,
-                                    const NcmContentId& expectedContentId,
-                                    bool compareContentId)
+    tin::install::SourceEntryAudit XCI::AuditFileEntry(
+        const HFS0FileEntry* fileEntry,
+        const NcmContentId& expectedContentId,
+        bool compareContentId)
     {
         if (!fileEntry) THROW_FORMAT("Cannot audit a null HFS0 entry");
         const u64 packageSize = GetSourceSize();
@@ -275,7 +276,10 @@ namespace tin::install::xci
         }
 
         std::string entryHash = "skipped_out_of_bounds";
-        std::string contentIdMatch = compareContentId ? "unavailable" : "not_applicable_compressed";
+        tin::install::SourceContentIdStatus contentIdStatus =
+            compareContentId
+                ? tin::install::SourceContentIdStatus::Unavailable
+                : tin::install::SourceContentIdStatus::NotApplicable;
         if (targetBoundsOk) {
             AstraSha256Context sha;
             std::array<u8, 64 * 1024> buffer{};
@@ -290,22 +294,25 @@ namespace tin::install::xci
             entryHash = sha256_digest_hex(sha.final());
             if (compareContentId) {
                 const std::string expected = tin::util::GetNcaIdString(expectedContentId);
-                contentIdMatch =
+                contentIdStatus =
                     entryHash.size() >= expected.size() &&
-                    entryHash.compare(0, expected.size(), expected) == 0 ? "yes" : "no";
+                    entryHash.compare(0, expected.size(), expected) == 0
+                        ? tin::install::SourceContentIdStatus::Match
+                        : tin::install::SourceContentIdStatus::Mismatch;
             }
         }
 
+        const std::string expectedId = tin::util::GetNcaIdString(expectedContentId);
         std::ostringstream out;
         // Put the verdict first. Even if a future UI or transport imposes a
         // display limit, the integrity/bounds result must survive ahead of the
         // lower-priority offset details.
-        out << "content_id_match=" << contentIdMatch
+        out << "content_id_match=" << tin::install::SourceContentIdStatusName(contentIdStatus)
             << " target_bounds=" << (targetBoundsOk ? "pass" : "fail")
             << " table_bounds=" << (tableBoundsOk ? "pass" : "fail")
             << " table_overlap=" << (tableOverlap ? "yes" : "no")
             << " entry_sha256=" << entryHash
-            << " expected_content_id=" << tin::util::GetNcaIdString(expectedContentId)
+            << " expected_content_id=" << expectedId
             << " container=HFS0"
             << " files=" << GetSecureHeader()->numFiles
             << " data_base=0x" << std::hex << dataBase
@@ -314,6 +321,15 @@ namespace tin::install::xci
             << " entry_size=0x" << fileEntry->fileSize
             << " entry_end=0x" << entryEnd
             << " package_size=0x" << packageSize;
-        return out.str();
+
+        tin::install::SourceEntryAudit result{};
+        result.contentIdStatus = contentIdStatus;
+        result.targetBoundsOk = targetBoundsOk;
+        result.tableBoundsOk = tableBoundsOk;
+        result.tableOverlap = tableOverlap;
+        result.entrySha256 = entryHash;
+        result.expectedContentId = expectedId;
+        result.details = out.str();
+        return result;
     }
 }

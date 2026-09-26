@@ -104,11 +104,23 @@ namespace tin::install::xci
                 });
         } catch (const std::exception& headerError) {
             if (contentInfo.content_type != NcmContentType_Meta) throw;
+            tin::install::SourceEntryAudit auditResult{};
+            bool auditReady = false;
             std::string audit;
             try {
-                audit = m_xci->AuditFileEntry(fileEntry, ncaId, !compressed);
+                auditResult = m_xci->AuditFileEntry(fileEntry, ncaId, !compressed);
+                audit = auditResult.details;
+                auditReady = true;
             } catch (const std::exception& auditError) {
                 audit = std::string("audit_failed=") + auditError.what();
+            }
+
+            if (auditReady && auditResult.provesContentIdMismatch()) {
+                THROW_FORMAT(
+                    "安装包 CNMT 内容与 Content ID 不一致: file=%s expected_content_id=%s actual_sha256=%s; "
+                    "请重新获取、重新复制或重新打包安装包; source_audit=[%s]",
+                    ncaFileName.c_str(), auditResult.expectedContentId.c_str(),
+                    auditResult.entrySha256.c_str(), audit.c_str());
             }
             THROW_FORMAT("%s; source_audit=[%s]", headerError.what(), audit.c_str());
         }

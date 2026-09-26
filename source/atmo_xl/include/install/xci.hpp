@@ -28,6 +28,7 @@ SOFTWARE.
 
 #include <switch/types.h>
 #include "install/hfs0.hpp"
+#include "install/source_entry_audit.hpp"
 #include "nx/ncm.hpp"
 #include <memory>
 
@@ -59,9 +60,10 @@ namespace tin::install::xci
             virtual const HFS0BaseHeader* GetSecureHeader();
             virtual u64 GetDataOffset();
             virtual u64 GetSourceSize() const = 0;
-            virtual std::string AuditFileEntry(const HFS0FileEntry* fileEntry,
-                                               const NcmContentId& expectedContentId,
-                                               bool compareContentId);
+            virtual tin::install::SourceEntryAudit AuditFileEntry(
+                const HFS0FileEntry* fileEntry,
+                const NcmContentId& expectedContentId,
+                bool compareContentId);
 
             virtual const HFS0FileEntry* GetFileEntry(unsigned int index);
             virtual const HFS0FileEntry* GetFileEntryByName(std::string name);
