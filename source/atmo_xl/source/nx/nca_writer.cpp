@@ -31,6 +31,7 @@ SOFTWARE.
 #include <zstd.h>
 
 #include "install/nca.hpp"
+#include "install/nca_header_probe.hpp"
 #include "install_performance.hpp"
 #include "util/config.hpp"
 #include "util/crypto.hpp"
@@ -529,13 +530,21 @@ bool NcaWriter::close() {
     if (m_closed) return true;
 
     if (!m_headerFlushed) {
-        if (m_buffer.size() != NCA_HEADER_SIZE)
-            THROW_FORMAT("truncated NCA header");
+        if (!m_headerParsed) {
+            if (m_buffer.size() < sizeof(tin::install::NcaHeader))
+                THROW_FORMAT("truncated NCA crypto header: need 0x%lx, got 0x%lx",
+                             static_cast<u64>(sizeof(tin::install::NcaHeader)),
+                             static_cast<u64>(m_buffer.size()));
+            parseHeader();
+        }
+        if (m_buffer.size() != m_prefixSize)
+            THROW_FORMAT("truncated NCA prefix: expected 0x%lx, got 0x%lx",
+                         m_prefixSize, static_cast<u64>(m_buffer.size()));
         flushHeader();
     }
 
     if (!m_writer && !m_bodyProbe.empty()) {
-        m_writer = std::make_shared<NcaBodyWriter>(m_ncaId, NCA_HEADER_SIZE, m_ncaSize,
+        m_writer = std::make_shared<NcaBodyWriter>(m_ncaId, m_prefixSize, m_ncaSize,
                                                   m_contentStorage, &m_hashContext,
                                                   m_placeholderId);
         m_writer->write(m_bodyProbe.data(), m_bodyProbe.size());
@@ -543,18 +552,22 @@ bool NcaWriter::close() {
     }
 
     if (m_writer) m_writer->close();
-    else if (m_ncaSize != NCA_HEADER_SIZE)
-        THROW_FORMAT("NCA body is missing");
+    else if (m_ncaSize != m_prefixSize)
+        THROW_FORMAT("NCA body is missing: prefix=0x%lx declared=0x%lx",
+                     m_prefixSize, m_ncaSize);
 
     if (inst::config::verifyNcaContentHashes) {
         if (!m_hashFinalized) {
             m_actualHash = m_hashContext.final();
             m_hashFinalized = true;
         }
+        const char* headerMode = m_headerPlaintext ? "plaintext" : "encrypted";
         if (std::memcmp(m_actualHash.data(), &m_ncaId, sizeof(m_ncaId)) != 0)
-            THROW_FORMAT("NCA SHA-256 与内容 ID 不匹配");
+            THROW_FORMAT("NCA SHA-256 与内容 ID 不匹配 [header_mode=%s prefix=0x%lx declared=0x%lx]",
+                         headerMode, m_prefixSize, m_ncaSize);
         if (m_hasExpectedHash && m_actualHash != m_expectedHash)
-            THROW_FORMAT("NCA SHA-256 与 CNMT 内容哈希不匹配");
+            THROW_FORMAT("NCA SHA-256 与 CNMT 内容哈希不匹配 [header_mode=%s prefix=0x%lx declared=0x%lx]",
+                         headerMode, m_prefixSize, m_ncaSize);
     }
 
     m_writer.reset();
@@ -571,13 +584,24 @@ u64 NcaWriter::write(const u8* ptr, u64 size) {
     if (m_closed) THROW_FORMAT("attempted to write a closed NCA");
     const u64 originalSize = size;
 
-    if (!m_headerFlushed) {
-        const u64 needed = NCA_HEADER_SIZE - m_buffer.size();
+    // All NCA variants have a 0xC00 crypto header, but NCZ keeps a 0x4000
+    // uncompressed prefix. Parse at 0xC00 first, then choose the real prefix
+    // target dynamically so legal small NCAs (for example 0xE00 CNMTs) do not
+    // get rejected while NCZ retains its canonical 0x4000 boundary.
+    while (!m_headerFlushed && size) {
+        const u64 target = m_headerParsed ? m_prefixSize : sizeof(tin::install::NcaHeader);
+        if (m_buffer.size() > target)
+            THROW_FORMAT("internal NCA prefix overflow");
+        const u64 needed = target - m_buffer.size();
         const u64 chunk = std::min(needed, size);
         append(m_buffer, ptr, chunk);
         ptr += chunk;
         size -= chunk;
-        if (m_buffer.size() == NCA_HEADER_SIZE) flushHeader();
+
+        if (!m_headerParsed && m_buffer.size() == sizeof(tin::install::NcaHeader))
+            parseHeader();
+        if (m_headerParsed && m_buffer.size() == m_prefixSize)
+            flushHeader();
     }
 
     if (size && !m_writer) {
@@ -589,11 +613,11 @@ u64 NcaWriter::write(const u8* ptr, u64 size) {
 
         if (m_bodyProbe.size() == sizeof(u64)) {
             if (read_u64(m_bodyProbe.data()) == kNczSectionMagic)
-                m_writer = std::make_shared<NczBodyWriter>(m_ncaId, NCA_HEADER_SIZE, m_ncaSize,
+                m_writer = std::make_shared<NczBodyWriter>(m_ncaId, m_prefixSize, m_ncaSize,
                                                            m_contentStorage, &m_hashContext,
                                                            m_placeholderId);
             else
-                m_writer = std::make_shared<NcaBodyWriter>(m_ncaId, NCA_HEADER_SIZE, m_ncaSize,
+                m_writer = std::make_shared<NcaBodyWriter>(m_ncaId, m_prefixSize, m_ncaSize,
                                                            m_contentStorage, &m_hashContext,
                                                            m_placeholderId);
             m_writer->write(m_bodyProbe.data(), m_bodyProbe.size());
@@ -608,30 +632,61 @@ u64 NcaWriter::write(const u8* ptr, u64 size) {
     return originalSize;
 }
 
+void NcaWriter::parseHeader() {
+    if (m_headerParsed) return;
+    if (m_buffer.size() < sizeof(tin::install::NcaHeader))
+        THROW_FORMAT("cannot parse an incomplete NCA crypto header");
+
+    const auto decoded = tin::install::DecodeNcaHeaderBytes(m_buffer.data(), m_buffer.size());
+    if (decoded.mode == tin::install::NcaHeaderMode::Invalid)
+        THROW_FORMAT("invalid NCA header during stream [raw_magic=0x%08x decrypted_magic=0x%08x]",
+                     decoded.rawMagic, decoded.decryptedMagic);
+
+    m_ncaSize = decoded.header.nca_size;
+    if (m_ncaSize < sizeof(tin::install::NcaHeader))
+        THROW_FORMAT("NCA declared size is smaller than its crypto header");
+    m_prefixSize = std::min<u64>(NCA_HEADER_SIZE, m_ncaSize);
+    m_headerPlaintext = decoded.mode == tin::install::NcaHeaderMode::Plaintext;
+    m_headerParsed = true;
+}
+
 void NcaWriter::flushHeader() {
     if (m_headerFlushed) return;
-    if (m_buffer.size() != NCA_HEADER_SIZE)
-        THROW_FORMAT("cannot flush an incomplete NCA header");
+    if (!m_headerParsed) parseHeader();
+    if (m_buffer.size() != m_prefixSize)
+        THROW_FORMAT("cannot flush an incomplete NCA prefix");
 
-    tin::install::NcaHeader header{};
-    std::memcpy(&header, m_buffer.data(), sizeof(header));
-    Crypto::Keys keys;
-    Crypto::AesXtr decryptor(keys.headerKey, false);
-    Crypto::AesXtr encryptor(keys.headerKey, true);
-    decryptor.decrypt(&header, &header, sizeof(header), 0, 0x200);
+    const auto decoded = tin::install::DecodeNcaHeaderBytes(m_buffer.data(), m_buffer.size());
+    if (decoded.mode == tin::install::NcaHeaderMode::Invalid)
+        THROW_FORMAT("invalid NCA header during prefix flush [raw_magic=0x%08x decrypted_magic=0x%08x]",
+                     decoded.rawMagic, decoded.decryptedMagic);
+    if (decoded.header.nca_size != m_ncaSize)
+        THROW_FORMAT("NCA declared size changed while streaming");
 
-    if (header.magic != MAGIC_NCA3 || header.nca_size < NCA_HEADER_SIZE)
-        THROW_FORMAT("invalid NCA header or declared size");
-
-    m_ncaSize = header.nca_size;
-    if (inst::config::verifyNcaContentHashes)
+    // For a normal encrypted source, validate the source bytes exactly as they
+    // arrived (preserving the historical gamecard->download conversion behavior).
+    if (inst::config::verifyNcaContentHashes && !m_headerPlaintext)
         m_hashContext.update(m_buffer.data(), m_buffer.size());
+
     if (!isOpen()) THROW_FORMAT("NCA placeholder storage is closed");
     m_contentStorage->CreatePlaceholder(m_ncaId, m_placeholderId,
                                         static_cast<std::size_t>(m_ncaSize));
 
+    tin::install::NcaHeader header = decoded.header;
     if (header.distribution == 1) header.distribution = 0;
+
+    // NCM expects the canonical encrypted NCA header. Encrypted input is
+    // normalized after decryption; plaintext input is encrypted here for the
+    // first time. Bytes after 0xC00 in the prefix are preserved verbatim.
+    Crypto::Keys keys;
+    Crypto::AesXtr encryptor(keys.headerKey, true);
     encryptor.encrypt(m_buffer.data(), &header, sizeof(header), 0, 0x200);
+
+    // A plaintext package header cannot be validated against its content ID until
+    // it has been normalized back to the encrypted on-storage representation.
+    if (inst::config::verifyNcaContentHashes && m_headerPlaintext)
+        m_hashContext.update(m_buffer.data(), m_buffer.size());
+
     const auto begin = std::chrono::steady_clock::now();
     m_contentStorage->WritePlaceholder(m_placeholderId, 0,
                                        m_buffer.data(), m_buffer.size());

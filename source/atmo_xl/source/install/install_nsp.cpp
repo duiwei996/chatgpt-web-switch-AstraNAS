@@ -103,6 +103,7 @@ namespace tin::install::nsp
         const u64 headerOffset = m_NSP->GetDataOffset() + fileEntry->dataOffset;
         const auto header = tin::install::ReadValidatedNcaHeader(
             "NSP", ncaFileName, headerOffset, fileEntry->fileSize, compressed,
+            m_destStorageId,
             [&](void* out, std::size_t size) {
                 m_NSP->BufferData(out, static_cast<off_t>(headerOffset), size);
             });

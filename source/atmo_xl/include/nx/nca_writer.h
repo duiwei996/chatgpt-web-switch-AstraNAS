@@ -67,6 +67,7 @@ public:
 	bool isOpen() const;
 	bool close();
 	u64 write(const  u8* ptr, u64 sz);
+	void parseHeader();
 	void flushHeader();
 
 protected:
@@ -80,6 +81,9 @@ protected:
 	std::array<u8, 32> m_expectedHash{};
 	std::array<u8, 32> m_actualHash{};
 	u64 m_ncaSize = 0;
+	u64 m_prefixSize = 0;
+	bool m_headerParsed = false;
+	bool m_headerPlaintext = false;
 	bool m_hasExpectedHash = false;
 	bool m_hashFinalized = false;
 	bool m_headerFlushed = false;

@@ -1,5 +1,13 @@
 # AstraNAS 更新记录
 
+## v1.0.3
+
+- NCA header 探针支持 plaintext/encrypted 自动识别，并在错误日志中同时记录 raw/decrypted magic、header mode、同偏移重读结果与 header-key 自检状态。
+- 新增基于设备已注册 NCA 的 SPL header-key 自检；明文 header 需要重新加密时，自检明确失败会阻止写入。
+- 重构 NcaWriter 前缀状态机：先在 0xC00 解析声明大小，再把前缀目标设为 min(0x4000, nca_size)，从而支持 0xE00 等合法小型 CNMT，同时保持 NCZ 的 0x4000 前缀语义。
+- plaintext header 写入 NCM 前恢复为标准加密 header；CNMT Content-ID/SHA-256 强校验继续覆盖最终写入路径。
+- 版本同步为 1.0.3，并为本次授权 main 提交设置一次性 GitHub-hosted 构建门禁。
+
 ## v1.0.2
 
 - 修正 v1.0.1 CNMT 自愈顺序：已注册且大小正确、可挂载的 CNMT 直接复用，不再先读取包内 NCA header。

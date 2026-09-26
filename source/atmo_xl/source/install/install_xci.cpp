@@ -95,6 +95,7 @@ namespace tin::install::xci
         const u64 headerOffset = m_xci->GetDataOffset() + fileEntry->dataOffset;
         const auto header = tin::install::ReadValidatedNcaHeader(
             "XCI", ncaFileName, headerOffset, fileEntry->fileSize, compressed,
+            m_destStorageId,
             [&](void* out, std::size_t size) {
                 m_xci->BufferData(out, static_cast<off_t>(headerOffset), size);
             });
