@@ -32,6 +32,7 @@ SOFTWARE.
 #include "util/util.hpp"
 #include "bridge/install_hooks.hpp"
 #include "install/nca.hpp"
+#include "install/nca_header_probe.hpp"
 #include <limits>
 
 namespace {
@@ -64,22 +65,17 @@ namespace tin::install::xci
         for (const HFS0FileEntry* fileEntry : cnmtEntries) {
             std::string cnmtNcaName(m_xci->GetFileEntryName(fileEntry));
             NcmContentId cnmtContentId = tin::util::GetNcaIdFromString(cnmtNcaName);
-            u64 cnmtNcaSize = fileEntry->fileSize;
-            if (has_ncz_suffix(cnmtNcaName)) {
-                tin::install::NcaHeader header{};
-                m_xci->BufferData(&header, m_xci->GetDataOffset() + fileEntry->dataOffset, sizeof(header));
-                Crypto::Keys keys;
-                Crypto::AesXtr decryptor(keys.headerKey, false);
-                decryptor.decrypt(&header, &header, sizeof(header), 0, 0x200);
-                if (header.magic != MAGIC_NCA3) THROW_FORMAT("Invalid compressed CNMT NCA header");
-                cnmtNcaSize = header.nca_size;
-            }
+            // Defer compressed CNMT header reads until repair/install is actually
+            // needed; the registered size is filled after a successful mount.
+            const bool compressedCnmt = has_ncz_suffix(cnmtNcaName);
+            u64 cnmtNcaSize = compressedCnmt ? 0 : fileEntry->fileSize;
 
             LOG_DEBUG("CNMT Name: %s\n", cnmtNcaName.c_str());
 
             NcmContentInfo cnmtContentInfo{};
             cnmtContentInfo.content_id = cnmtContentId;
-            ncmU64ToContentInfoSize(cnmtNcaSize, &cnmtContentInfo);
+            if (cnmtNcaSize != 0)
+                ncmU64ToContentInfoSize(cnmtNcaSize, &cnmtContentInfo);
             cnmtContentInfo.content_type = NcmContentType_Meta;
 
             // Keep XCI/XCZ on the same verified CNMT recovery path as NSP/NSZ.
@@ -96,18 +92,12 @@ namespace tin::install::xci
         if (!fileEntry) THROW_FORMAT("package is missing a referenced NCA");
         std::string ncaFileName = m_xci->GetFileEntryName(fileEntry);
         const bool compressed = has_ncz_suffix(ncaFileName);
-        const u64 minimumNcaSize = compressed ? NCA_HEADER_SIZE : sizeof(tin::install::NcaHeader);
-        if (fileEntry->fileSize < minimumNcaSize)
-            THROW_FORMAT("Package NCA entry is truncated: %s (0x%lx bytes, need at least 0x%lx)",
-                         ncaFileName.c_str(), fileEntry->fileSize, minimumNcaSize);
-
-        tin::install::NcaHeader header{};
-        m_xci->BufferData(&header, m_xci->GetDataOffset() + fileEntry->dataOffset, sizeof(header));
-        Crypto::AesXtr crypto(Crypto::Keys().headerKey, false);
-        crypto.decrypt(&header, &header, sizeof(header), 0, 0x200);
-        const u64 minimumDeclaredSize = compressed ? NCA_HEADER_SIZE : sizeof(tin::install::NcaHeader);
-        if (header.magic != MAGIC_NCA3 || header.nca_size < minimumDeclaredSize)
-            THROW_FORMAT("Invalid NCA header");
+        const u64 headerOffset = m_xci->GetDataOffset() + fileEntry->dataOffset;
+        const auto header = tin::install::ReadValidatedNcaHeader(
+            "XCI", ncaFileName, headerOffset, fileEntry->fileSize, compressed,
+            [&](void* out, std::size_t size) {
+                m_xci->BufferData(out, static_cast<off_t>(headerOffset), size);
+            });
         u64 expectedSize = 0;
         ncmContentInfoSizeToU64(&contentInfo, &expectedSize);
         if (expectedSize != 0 && header.nca_size != expectedSize)

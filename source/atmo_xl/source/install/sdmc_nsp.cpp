@@ -6,7 +6,9 @@
 #include "util/lang.hpp"
 #include "bridge/install_hooks.hpp"
 #include "title_backend/buffered_stream.hpp"
+#include "install_performance.hpp"
 #include <algorithm>
+#include <chrono>
 #include <exception>
 
 namespace tin::install::nsp
@@ -96,8 +98,16 @@ namespace tin::install::nsp
         if (offset < 0) THROW_FORMAT("invalid negative NSP source offset");
         std::size_t actual = 0;
         std::string error;
-        if (!m_source->read_at(static_cast<std::uint64_t>(offset), buf, size, actual, error) ||
-            actual != size)
-            THROW_FORMAT("NSP 安装源读取失败: %s", error.empty() ? "输入数据被截断" : error.c_str());
+        const auto begin = std::chrono::steady_clock::now();
+        const bool ok = m_source->read_at(static_cast<std::uint64_t>(offset), buf, size, actual, error);
+        const auto end = std::chrono::steady_clock::now();
+        astranas::install_performance::add_source_read(
+            actual,
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count()));
+        if (!ok || actual != size)
+            THROW_FORMAT("NSP 安装源读取失败 [offset=0x%lx requested=0x%lx actual=0x%lx]: %s",
+                         static_cast<u64>(offset), static_cast<u64>(size), static_cast<u64>(actual),
+                         error.empty() ? "输入数据被截断" : error.c_str());
     }
 }

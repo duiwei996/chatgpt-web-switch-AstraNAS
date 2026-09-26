@@ -39,15 +39,46 @@
         m_forceReinstall = previousForce;
     }
 
-    nx::ncm::ContentMeta Install::InstallAndReadCnmtWithRepair(const NcmContentInfo& contentInfo)
+    nx::ncm::ContentMeta Install::InstallAndReadCnmtWithRepair(NcmContentInfo& contentInfo)
     {
         nx::ncm::ContentStorage storage(m_destStorageId);
         const bool existedBefore = storage.Has(contentInfo.content_id);
+        u64 expectedSize = 0;
+        ncmContentInfoSizeToU64(&contentInfo, &expectedSize);
 
-        // CNMT controls the rest of the transaction, so any CNMT bytes AstraNAS
-        // writes must pass the content-ID hash even when the large-NCA hash option
-        // is disabled for performance. Existing content is first reused normally;
-        // only a size/mount failure promotes it to a verified replacement.
+        auto readInstalledCnmt = [&]() -> nx::ncm::ContentMeta
+        {
+            auto meta = tin::util::GetContentMetaFromNCA(storage.GetPath(contentInfo.content_id));
+            // Compressed CNMT entries may intentionally enter with size=0 so an
+            // already-registered healthy CNMT can be reused without reading the
+            // package header merely to discover its decompressed size.
+            const u64 registeredSize = storage.GetSize(contentInfo.content_id);
+            ncmU64ToContentInfoSize(registeredSize, &contentInfo);
+            return meta;
+        };
+
+        // v1.0.2: a healthy registered CNMT must be reusable without touching the
+        // package source at all. Only size/mount failure promotes it to repair.
+        std::string existingFailure;
+        if (existedBefore)
+        {
+            try
+            {
+                const u64 existingSize = storage.GetSize(contentInfo.content_id);
+                if (expectedSize != 0 && existingSize != expectedSize)
+                    THROW_FORMAT("Existing CNMT size mismatch: expected 0x%lx, found 0x%lx",
+                                 expectedSize, existingSize);
+                return readInstalledCnmt();
+            }
+            catch (...)
+            {
+                existingFailure = current_exception_message();
+            }
+        }
+
+        // Any CNMT bytes written from the package control the rest of the
+        // transaction, so force Content-ID/CNMT SHA-256 validation even when the
+        // optional large-NCA hash setting is disabled.
         auto installVerifiedCnmt = [&](bool repairExisting)
         {
             const bool previousHashVerification = inst::config::verifyNcaContentHashes;
@@ -65,32 +96,18 @@
             inst::config::verifyNcaContentHashes = previousHashVerification;
         };
 
-        bool repaired = false;
         try
         {
-            installVerifiedCnmt(false);
+            installVerifiedCnmt(existedBefore);
         }
         catch (...)
         {
-            if (!existedBefore) throw;
-            const std::string prepareFailure = current_exception_message();
-            try
-            {
-                installVerifiedCnmt(true);
-                repaired = true;
-            }
-            catch (...)
-            {
-                const std::string repairFailure = current_exception_message();
-                THROW_FORMAT("Existing CNMT preflight failed (%s); verified package repair failed: %s",
-                             prepareFailure.c_str(), repairFailure.c_str());
-            }
+            const std::string packageFailure = current_exception_message();
+            if (existedBefore)
+                THROW_FORMAT("Existing CNMT is unusable (%s); verified package repair failed: %s",
+                             existingFailure.c_str(), packageFailure.c_str());
+            THROW_FORMAT("Verified package CNMT install failed: %s", packageFailure.c_str());
         }
-
-        auto readInstalledCnmt = [&]() -> nx::ncm::ContentMeta
-        {
-            return tin::util::GetContentMetaFromNCA(storage.GetPath(contentInfo.content_id));
-        };
 
         try
         {
@@ -99,37 +116,13 @@
         catch (...)
         {
             const std::string mountFailure = current_exception_message();
-            if (!existedBefore)
-                throw;
-            if (repaired)
-                THROW_FORMAT("CNMT was replaced with verified package content but still cannot be mounted: %s",
-                             mountFailure.c_str());
-
-            try
-            {
-                installVerifiedCnmt(true);
-                repaired = true;
-            }
-            catch (...)
-            {
-                const std::string repairFailure = current_exception_message();
-                THROW_FORMAT("Existing CNMT cannot be mounted (%s); verified package repair failed: %s",
-                             mountFailure.c_str(), repairFailure.c_str());
-            }
-
-            try
-            {
-                return readInstalledCnmt();
-            }
-            catch (...)
-            {
-                const std::string retryFailure = current_exception_message();
+            if (existedBefore)
                 THROW_FORMAT("Existing CNMT was replaced with verified package content but mount still failed; before=%s; after=%s",
-                             mountFailure.c_str(), retryFailure.c_str());
-            }
+                             existingFailure.c_str(), mountFailure.c_str());
+            THROW_FORMAT("New verified CNMT was registered but cannot be mounted: %s",
+                         mountFailure.c_str());
         }
     }
-
     const u8* Install::FindExpectedContentHash(const NcmContentId& contentId) const
     {
         const auto value = std::find_if(m_expectedContentHashes.begin(),

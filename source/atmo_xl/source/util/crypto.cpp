@@ -3,6 +3,18 @@
 #include <stdexcept>
 #include <string.h>
 #include <mbedtls/bignum.h>
+#include "util/error.hpp"
+
+Crypto::Keys::Keys()
+{
+    u8 kek[0x10] = {};
+    ASSERT_OK(splCryptoGenerateAesKek(headerKekSource, 0, 0, kek),
+              "Failed to derive NCA header KEK");
+    ASSERT_OK(splCryptoGenerateAesKey(kek, headerKeySource, headerKey),
+              "Failed to derive NCA header key 0");
+    ASSERT_OK(splCryptoGenerateAesKey(kek, headerKeySource + 0x10, headerKey + 0x10),
+              "Failed to derive NCA header key 1");
+}
 
 void Crypto::calculateMGF1andXOR(unsigned char* data, size_t data_size, const void* source, size_t source_size) {
     unsigned char h_buf[RSA_2048_BYTES] = {0};

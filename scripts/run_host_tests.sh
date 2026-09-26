@@ -81,13 +81,20 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'e537cc9437f436bf81ec384fd825dd82d8704094'" .github/workflows/build-nro.yml
+grep -q "github.event.before == '44c7d5cf4f3ad4b804517539c2f5c6bef0bc6a5d'" .github/workflows/build-nro.yml
+! grep -q 'e537cc9437f436bf81ec384fd825dd82d8704094' .github/workflows/build-nro.yml
 ! grep -Eq '^[[:space:]]+pull_request:' .github/workflows/build-nro.yml
 ! grep -Eq '^[[:space:]]+(push|pull_request):' .github/workflows/build-nro-self-hosted.yml
 grep -q 'InstallAndReadCnmtWithRepair' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
 grep -q 'ReinstallNcaTracked' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install_parts/install_part_03.inc
 grep -q 'verifyNcaContentHashes = true' source/atmo_xl/source/install/install_parts/install_part_03.inc
 grep -q 'if (existed && !m_forceReinstall)' source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q 'a healthy registered CNMT must be reusable without touching' source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q 'Compressed CNMT entries may intentionally enter with size=0' source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q 'ReadValidatedNcaHeader' source/atmo_xl/include/install/nca_header_probe.hpp source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
+grep -q 'reread=%s' source/atmo_xl/include/install/nca_header_probe.hpp
+grep -q 'Failed to derive NCA header KEK' source/atmo_xl/source/util/crypto.cpp
+grep -q 'add_source_read' source/atmo_xl/source/install/sdmc_nsp.cpp source/atmo_xl/source/install/sdmc_xci.cpp
 grep -q 'AstraNAS-source.zip' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -q 'BUILD-MANIFEST.txt' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -q 'SHA256SUMS.txt' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
