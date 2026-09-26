@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  ASTRANAS_VERSION: "1.0.3"
+  ASTRANAS_VERSION: "1.0.4"
 
 jobs:
   build-self-hosted:

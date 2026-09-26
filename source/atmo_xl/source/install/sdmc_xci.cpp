@@ -93,6 +93,11 @@ namespace tin::install::xci
         writer->close();
     }
 
+    u64 SDMCXCI::GetSourceSize() const
+    {
+        return m_source ? m_source->size() : 0;
+    }
+
     void SDMCXCI::BufferData(void* buf, off_t offset, size_t size)
     {
         if (offset < 0) THROW_FORMAT("invalid negative XCI source offset");

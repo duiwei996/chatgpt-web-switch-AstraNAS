@@ -40,6 +40,7 @@ namespace tin::install::nsp
             NcmContentId ncaId, NcmPlaceHolderId placeholderId,
             const u8* expectedHash) override;
         virtual void BufferData(void* buf, off_t offset, size_t size) override;
+        u64 GetSourceSize() const override;
     private:
         void StreamToPlaceholderImpl(std::shared_ptr<nx::ncm::ContentStorage>& contentStorage,
                                      NcmContentId ncaId, const NcmPlaceHolderId* placeholderId,

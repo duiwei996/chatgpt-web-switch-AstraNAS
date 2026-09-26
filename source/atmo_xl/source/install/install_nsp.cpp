@@ -26,6 +26,7 @@ SOFTWARE.
 #include <cctype>
 #include <machine/endian.h>
 #include <limits>
+#include <exception>
 
 #include "install/nca.hpp"
 #include "install/nca_header_probe.hpp"
@@ -101,12 +102,24 @@ namespace tin::install::nsp
         std::string ncaFileName = m_NSP->GetFileEntryName(fileEntry);
         const bool compressed = has_ncz_suffix(ncaFileName);
         const u64 headerOffset = m_NSP->GetDataOffset() + fileEntry->dataOffset;
-        const auto header = tin::install::ReadValidatedNcaHeader(
-            "NSP", ncaFileName, headerOffset, fileEntry->fileSize, compressed,
-            m_destStorageId,
-            [&](void* out, std::size_t size) {
-                m_NSP->BufferData(out, static_cast<off_t>(headerOffset), size);
-            });
+        tin::install::NcaHeader header{};
+        try {
+            header = tin::install::ReadValidatedNcaHeader(
+                "NSP", ncaFileName, headerOffset, fileEntry->fileSize, compressed,
+                m_destStorageId,
+                [&](void* out, std::size_t size) {
+                    m_NSP->BufferData(out, static_cast<off_t>(headerOffset), size);
+                });
+        } catch (const std::exception& headerError) {
+            if (contentInfo.content_type != NcmContentType_Meta) throw;
+            std::string audit;
+            try {
+                audit = m_NSP->AuditFileEntry(fileEntry, ncaId, !compressed);
+            } catch (const std::exception& auditError) {
+                audit = std::string("audit_failed=") + auditError.what();
+            }
+            THROW_FORMAT("%s; source_audit=[%s]", headerError.what(), audit.c_str());
+        }
         u64 expectedSize = 0;
         ncmContentInfoSizeToU64(&contentInfo, &expectedSize);
         if (expectedSize != 0 && header.nca_size != expectedSize)

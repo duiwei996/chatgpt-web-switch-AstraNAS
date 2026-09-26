@@ -57,6 +57,10 @@ namespace tin::install::nsp
             virtual void RetrieveHeader();
             virtual const PFS0BaseHeader* GetBaseHeader();
             virtual u64 GetDataOffset();
+            virtual u64 GetSourceSize() const = 0;
+            virtual std::string AuditFileEntry(const PFS0FileEntry* fileEntry,
+                                               const NcmContentId& expectedContentId,
+                                               bool compareContentId);
 
             virtual const PFS0FileEntry* GetFileEntry(unsigned int index);
             virtual const PFS0FileEntry* GetFileEntryByName(std::string name);

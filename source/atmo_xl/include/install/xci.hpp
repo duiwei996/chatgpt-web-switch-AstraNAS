@@ -58,6 +58,10 @@ namespace tin::install::xci
             virtual void RetrieveHeader();
             virtual const HFS0BaseHeader* GetSecureHeader();
             virtual u64 GetDataOffset();
+            virtual u64 GetSourceSize() const = 0;
+            virtual std::string AuditFileEntry(const HFS0FileEntry* fileEntry,
+                                               const NcmContentId& expectedContentId,
+                                               bool compareContentId);
 
             virtual const HFS0FileEntry* GetFileEntry(unsigned int index);
             virtual const HFS0FileEntry* GetFileEntryByName(std::string name);

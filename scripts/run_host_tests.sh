@@ -81,7 +81,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'd3e2c76b97d86c6578386fccddf212dcfb88ff05'" .github/workflows/build-nro.yml
+grep -q "github.event.before == '7d6b77d4ee8844643242ae65fe415563898878fb'" .github/workflows/build-nro.yml
+! grep -q 'd3e2c76b97d86c6578386fccddf212dcfb88ff05' .github/workflows/build-nro.yml
 ! grep -q '44c7d5cf4f3ad4b804517539c2f5c6bef0bc6a5d' .github/workflows/build-nro.yml
 ! grep -q 'e537cc9437f436bf81ec384fd825dd82d8704094' .github/workflows/build-nro.yml
 ! grep -Eq '^[[:space:]]+pull_request:' .github/workflows/build-nro.yml
@@ -104,6 +105,13 @@ grep -q 'm_prefixSize = std::min<u64>(NCA_HEADER_SIZE, m_ncaSize)' source/atmo_x
 grep -q 'legal small NCAs (for example 0xE00 CNMTs)' source/atmo_xl/source/nx/nca_writer.cpp
 grep -q 'm_headerPlaintext' source/atmo_xl/include/nx/nca_writer.h source/atmo_xl/source/nx/nca_writer.cpp
 grep -q 'Failed to derive NCA header KEK' source/atmo_xl/source/util/crypto.cpp
+grep -q 'AuditFileEntry' source/atmo_xl/include/install/nsp.hpp source/atmo_xl/include/install/xci.hpp source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'content_id_match=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'entry_sha256=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'table_bounds=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'table_overlap=' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'not_applicable_compressed' source/atmo_xl/source/install/nsp.cpp source/atmo_xl/source/install/xci.cpp
+grep -q 'source_audit=\[%s\]' source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
 grep -q 'add_source_read' source/atmo_xl/source/install/sdmc_nsp.cpp source/atmo_xl/source/install/sdmc_xci.cpp
 grep -q 'AstraNAS-source.zip' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -q 'BUILD-MANIFEST.txt' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml

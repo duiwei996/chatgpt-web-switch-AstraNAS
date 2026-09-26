@@ -1,8 +1,16 @@
-# AstraNAS v1.0.3
+# AstraNAS v1.0.4
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.0.4 CNMT 源包完整性审计
+
+- 不放宽任何 NCA 安装校验；当 CNMT header 已确认无效时，才额外读取该 metadata entry 做源包审计。
+- 对未压缩 `.cnmt.nca` 计算整个 entry 的 SHA-256，并用前 16 字节直接对比文件名中的 NCA Content ID，日志输出 `entry_sha256` 与 `content_id_match=yes/no`。
+- 同时输出 PFS0/HFS0 的 `data_base`、entry relative/absolute offset、entry end、package size，并验证目标 entry 是否越界、整个文件表是否越界或重叠。
+- 对 `.cnmt.ncz` 仍记录压缩 entry 的 SHA-256 指纹，但明确标记 `content_id_match=not_applicable_compressed`，避免将压缩文件哈希错误地与解压后 NCA Content ID 比较。
+- 审计只在 header 失败路径触发，因此正常安装不会增加整 entry 的额外读取。
 
 ## v1.0.3 小型 CNMT / NCA Header 兼容修复
 
@@ -169,7 +177,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.3 主分支修复交付，GitHub-hosted workflow 保留一个只匹配“v1.0.2 提交 → v1.0.3”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
+两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.4 主分支诊断交付，GitHub-hosted workflow 保留一个只匹配“v1.0.3 提交 → v1.0.4”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
 
 本地 devkitPro：
 

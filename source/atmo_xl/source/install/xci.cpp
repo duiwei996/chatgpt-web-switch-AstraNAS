@@ -28,6 +28,10 @@ SOFTWARE.
 #include <cctype>
 #include <cstring>
 #include <limits>
+#include <array>
+#include <sstream>
+#include <utility>
+#include "sha256.hpp"
 
 namespace tin::install::xci
 {
@@ -223,5 +227,91 @@ namespace tin::install::xci
         if (!fileEntry) THROW_FORMAT("Cannot get the name of a null HFS0 entry");
         const auto* header = this->GetSecureHeader();
         return checked_file_name(header, fileEntry);
+    }
+
+    std::string XCI::AuditFileEntry(const HFS0FileEntry* fileEntry,
+                                    const NcmContentId& expectedContentId,
+                                    bool compareContentId)
+    {
+        if (!fileEntry) THROW_FORMAT("Cannot audit a null HFS0 entry");
+        const u64 packageSize = GetSourceSize();
+        const u64 dataBase = GetDataOffset();
+        bool tableBoundsOk = dataBase <= packageSize;
+        bool tableOverlap = false;
+        std::vector<std::pair<u64, u64>> ranges;
+        ranges.reserve(GetSecureHeader()->numFiles);
+
+        for (unsigned int i = 0; i < GetSecureHeader()->numFiles; ++i) {
+            const auto* entry = GetFileEntry(i);
+            if (entry->dataOffset > std::numeric_limits<u64>::max() - dataBase) {
+                tableBoundsOk = false;
+                continue;
+            }
+            const u64 begin = dataBase + entry->dataOffset;
+            if (begin > packageSize || entry->fileSize > packageSize - begin) {
+                tableBoundsOk = false;
+                continue;
+            }
+            ranges.emplace_back(begin, begin + entry->fileSize);
+        }
+        std::sort(ranges.begin(), ranges.end());
+        u64 previousEnd = 0;
+        bool havePrevious = false;
+        for (const auto& range : ranges) {
+            if (havePrevious && range.first < previousEnd) tableOverlap = true;
+            previousEnd = std::max(previousEnd, range.second);
+            havePrevious = true;
+        }
+
+        bool targetBoundsOk = false;
+        u64 absoluteOffset = 0;
+        u64 entryEnd = 0;
+        if (fileEntry->dataOffset <= std::numeric_limits<u64>::max() - dataBase) {
+            absoluteOffset = dataBase + fileEntry->dataOffset;
+            if (absoluteOffset <= packageSize && fileEntry->fileSize <= packageSize - absoluteOffset) {
+                entryEnd = absoluteOffset + fileEntry->fileSize;
+                targetBoundsOk = true;
+            }
+        }
+
+        std::string entryHash = "skipped_out_of_bounds";
+        std::string contentIdMatch = compareContentId ? "unavailable" : "not_applicable_compressed";
+        if (targetBoundsOk) {
+            AstraSha256Context sha;
+            std::array<u8, 64 * 1024> buffer{};
+            u64 position = 0;
+            while (position < fileEntry->fileSize) {
+                const size_t chunk = static_cast<size_t>(
+                    std::min<u64>(buffer.size(), fileEntry->fileSize - position));
+                BufferData(buffer.data(), static_cast<off_t>(absoluteOffset + position), chunk);
+                sha.update(buffer.data(), chunk);
+                position += chunk;
+            }
+            entryHash = sha256_digest_hex(sha.final());
+            if (compareContentId) {
+                const std::string expected = tin::util::GetNcaIdString(expectedContentId);
+                contentIdMatch =
+                    entryHash.size() >= expected.size() &&
+                    entryHash.compare(0, expected.size(), expected) == 0 ? "yes" : "no";
+            }
+        }
+
+        std::ostringstream out;
+        out << "container=HFS0"
+            << " files=" << GetSecureHeader()->numFiles
+            << " data_base=0x" << std::hex << dataBase
+            << " relative_offset=0x" << fileEntry->dataOffset
+            << " absolute_offset=0x" << absoluteOffset
+            << " entry_size=0x" << fileEntry->fileSize
+            << " entry_end=0x" << entryEnd
+            << " package_size=0x" << packageSize
+            << std::dec
+            << " target_bounds=" << (targetBoundsOk ? "pass" : "fail")
+            << " table_bounds=" << (tableBoundsOk ? "pass" : "fail")
+            << " table_overlap=" << (tableOverlap ? "yes" : "no")
+            << " expected_content_id=" << tin::util::GetNcaIdString(expectedContentId)
+            << " entry_sha256=" << entryHash
+            << " content_id_match=" << contentIdMatch;
+        return out.str();
     }
 }

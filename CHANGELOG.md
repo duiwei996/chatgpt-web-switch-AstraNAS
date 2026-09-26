@@ -1,5 +1,14 @@
 # AstraNAS 更新记录
 
+## v1.0.4
+
+- CNMT header 无效时增加完整源 entry 审计，不改变正常安装与安全校验策略。
+- 未压缩 CNMT 会计算整个 entry SHA-256，并将 digest 前 16 字节与 NCA Content ID 比较，直接输出 `content_id_match=yes/no`。
+- NSP/PFS0 与 XCI/HFS0 同步输出 data base、relative/absolute offset、entry end、package size、目标越界、文件表越界与重叠状态。
+- 压缩 CNMT 仅记录压缩 entry 指纹并标记 Content-ID 比较不适用，避免错误结论。
+- 审计读取继续进入安装性能统计，便于区分 header probe 与完整 CNMT 验证成本。
+- 版本同步为 1.0.4，并为本次授权 main 提交设置一次性 GitHub-hosted 构建门禁。
+
 ## v1.0.3
 
 - NCA header 探针支持 plaintext/encrypted 自动识别，并在错误日志中同时记录 raw/decrypted magic、header mode、同偏移重读结果与 header-key 自检状态。
