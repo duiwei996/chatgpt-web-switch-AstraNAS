@@ -1,8 +1,15 @@
-# AstraNAS v1.0.4
+# AstraNAS v1.0.5
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.0.5 长诊断链无截断与审计结论前置
+
+- 修复 `THROW_FORMAT` 固定 640 字节 payload 导致嵌套安装异常被静默截断的问题；格式化异常改为按实际长度动态分配，完整保留 header probe 与 source audit。
+- CNMT 源审计把 `content_id_match`、target/table bounds、overlap 和完整 entry SHA-256 前置，确保最关键结论优先进入日志。
+- 新增 host 回归测试，构造超过 1 KiB 的异常 payload 并验证尾部 sentinel 仍存在，防止未来再次退化为固定缓冲截断。
+- 安装策略与 NCA 安全校验保持不变，本版只修复诊断可观测性。
 
 ## v1.0.4 CNMT 源包完整性审计
 
@@ -177,7 +184,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.4 主分支诊断交付，GitHub-hosted workflow 保留一个只匹配“v1.0.3 提交 → v1.0.4”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
+两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.5 主分支诊断交付，GitHub-hosted workflow 保留一个只匹配“v1.0.4 提交 → v1.0.5”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
 
 本地 devkitPro：
 

@@ -254,21 +254,23 @@ namespace tin::install::nsp
         }
 
         std::ostringstream out;
-        out << "container=PFS0"
+        // Put the verdict first. Even if a future UI or transport imposes a
+        // display limit, the integrity/bounds result must survive ahead of the
+        // lower-priority offset details.
+        out << "content_id_match=" << contentIdMatch
+            << " target_bounds=" << (targetBoundsOk ? "pass" : "fail")
+            << " table_bounds=" << (tableBoundsOk ? "pass" : "fail")
+            << " table_overlap=" << (tableOverlap ? "yes" : "no")
+            << " entry_sha256=" << entryHash
+            << " expected_content_id=" << tin::util::GetNcaIdString(expectedContentId)
+            << " container=PFS0"
             << " files=" << GetBaseHeader()->numFiles
             << " data_base=0x" << std::hex << dataBase
             << " relative_offset=0x" << fileEntry->dataOffset
             << " absolute_offset=0x" << absoluteOffset
             << " entry_size=0x" << fileEntry->fileSize
             << " entry_end=0x" << entryEnd
-            << " package_size=0x" << packageSize
-            << std::dec
-            << " target_bounds=" << (targetBoundsOk ? "pass" : "fail")
-            << " table_bounds=" << (tableBoundsOk ? "pass" : "fail")
-            << " table_overlap=" << (tableOverlap ? "yes" : "no")
-            << " expected_content_id=" << tin::util::GetNcaIdString(expectedContentId)
-            << " entry_sha256=" << entryHash
-            << " content_id_match=" << contentIdMatch;
+            << " package_size=0x" << packageSize;
         return out.str();
     }
 }

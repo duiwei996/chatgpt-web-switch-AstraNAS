@@ -1,5 +1,13 @@
 # AstraNAS 更新记录
 
+## v1.0.5
+
+- 修复 `THROW_FORMAT` 640 字节固定 payload 在多层异常包装时静默截断 source audit 尾部的问题，改为动态长度格式化。
+- CNMT 审计日志将 Content-ID 比较、bounds/overlap 和完整 entry SHA-256 移到最前，避免关键判定被后续偏移详情挤出。
+- 新增长异常 host regression，验证超过 1 KiB 的格式化错误仍完整保留尾部 sentinel。
+- 不改变安装成功条件、NCA header 校验或 Content-ID 校验；本版只提升诊断完整性。
+- 版本同步为 1.0.5，并为本次授权 main 提交设置一次性 GitHub-hosted 构建门禁。
+
 ## v1.0.4
 
 - CNMT header 无效时增加完整源 entry 审计，不改变正常安装与安全校验策略。

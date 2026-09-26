@@ -22,9 +22,10 @@ SOFTWARE.
 
 #pragma once
 
-#include <cstring>
-#include <stdexcept>
 #include <cstdio>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #define ASSERT_OK(res_expr, desc) \
     ({ \
@@ -35,16 +36,31 @@ SOFTWARE.
         } \
     })
 
-// Keep enough room for layered diagnostics such as package entry + container offset
-// + NCZ section bytes. The old 256-byte formatted payload silently truncated the
-// exact bytes that are most useful when diagnosing a streaming offset failure.
-#define THROW_FORMAT(format, ...) \
-    ({ \
-        char error_prefix[768] = {}; std::snprintf(error_prefix, sizeof(error_prefix)-1, "%s:%u: ", __func__, __LINE__); \
-        char formatted_msg[640] = {}; std::snprintf(formatted_msg, sizeof(formatted_msg)-1, format, ##__VA_ARGS__); \
-        std::strncat(error_prefix, formatted_msg, sizeof(error_prefix)-std::strlen(error_prefix)-1); throw std::runtime_error(error_prefix); \
-    })
+namespace tin::util
+{
+    template <typename... Args>
+    [[noreturn]] inline void throw_formatted_error(const char* function,
+                                                   unsigned int line,
+                                                   const char* format,
+                                                   Args... args)
+    {
+        const int payloadSize = std::snprintf(nullptr, 0, format, args...);
+        const std::string prefix = std::string(function ? function : "?") + ":" +
+                                   std::to_string(line) + ": ";
+        if (payloadSize < 0)
+            throw std::runtime_error(prefix + "error formatting failed");
 
+        std::vector<char> payload(static_cast<std::size_t>(payloadSize) + 1U, '\0');
+        std::snprintf(payload.data(), payload.size(), format, args...);
+        throw std::runtime_error(prefix + payload.data());
+    }
+}
+
+// Nested install diagnostics can exceed 1 KiB. Dynamic formatting prevents the
+// source-audit verdict/hash tail from being silently lost by an intermediate
+// exception wrapper.
+#define THROW_FORMAT(...) \
+    ::tin::util::throw_formatted_error(__func__, __LINE__, __VA_ARGS__)
 
 #ifdef NXLINK_DEBUG
 #define LOG_DEBUG(format, ...) { std::printf("%s:%u: ", __func__, __LINE__); std::printf(format, ##__VA_ARGS__); }
