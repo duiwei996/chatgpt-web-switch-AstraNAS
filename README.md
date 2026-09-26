@@ -1,8 +1,15 @@
-# AstraNAS v1.0.0
+# AstraNAS v1.0.1
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.0.1 安装完整性修复
+
+- 修复 SD/NAND 中已有同 Content ID、同大小但已损坏的 CNMT 被直接复用，导致安装在 `OpenFileSystemWithId` 阶段立即失败的问题。
+- NSP/NSZ 与 XCI/XCZ 在准备阶段会先复用可正常挂载的 CNMT；已有 CNMT 无法读取或大小异常时，会从当前安装包使用 replacement placeholder 自动修复后再重试。
+- CNMT 新写入和自动修复始终强制执行 Content-ID/SHA-256 校验；大体积内容 NCA 仍按 `verify_nca_content_hash` 配置决定是否做完整哈希，避免默认安装性能回退。
+- 强制替换路径现在允许修复“已注册但大小错误”的旧 NCA，不再在 replacement 写入前被旧 size 检查阻断。
 
 ## v1.0.0 首个公开版本
 
@@ -148,7 +155,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-仓库内两个正式 GitHub Actions workflow 都是 **仅 `workflow_dispatch` 手动触发**，push/PR 不会自动消耗 runner。
+两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.1 主分支交付，GitHub-hosted workflow 保留一个只匹配“公开 1.0.0 根提交 → v1.0.1”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
 
 本地 devkitPro：
 

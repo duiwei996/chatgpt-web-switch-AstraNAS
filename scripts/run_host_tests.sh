@@ -80,7 +80,17 @@ grep -q '测速日志已保存本地；需在网络配置中手动上传' "${net
 grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
-! grep -Eq '^[[:space:]]+(push|pull_request):' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
+grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
+grep -q "github.event.before == 'e537cc9437f436bf81ec384fd825dd82d8704094'" .github/workflows/build-nro.yml
+! grep -Eq '^[[:space:]]+pull_request:' .github/workflows/build-nro.yml
+! grep -Eq '^[[:space:]]+(push|pull_request):' .github/workflows/build-nro-self-hosted.yml
+grep -q 'InstallAndReadCnmtWithRepair' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
+grep -q 'ReinstallNcaTracked' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q 'verifyNcaContentHashes = true' source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q 'if (existed && !m_forceReinstall)' source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q 'AstraNAS-source.zip' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
+grep -q 'BUILD-MANIFEST.txt' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
+grep -q 'SHA256SUMS.txt' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/v05_config_test.cpp source/config.cpp -Isource -o /tmp/AstraNAS-v05-config-test
 /tmp/AstraNAS-v05-config-test
@@ -128,5 +138,5 @@ trap - EXIT
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror -c source/title_backend/install_session.cpp -Isource -o /tmp/AstraNAS-install-session.o
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror -c source/title_backend/backend_provider.cpp -Isource -Isource/atmo_xl/include -Isource/atmo_xl/include/util -o /tmp/AstraNAS-backend-provider.o
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror -c source/main.cpp -Isource -o /tmp/AstraNAS-main.o
-python3 -m py_compile scripts/check_ui_localization.py scripts/check_nro_bundle.py scripts/fill_nacp_languages.py scripts/generate_manifest.py tests/nacp_language_test.py tests/hbmenu_layout_test.py tests/webdav_put_server.py tests/webdav_range_server.py
+python3 -m py_compile scripts/check_ui_localization.py scripts/check_nro_bundle.py scripts/fill_nacp_languages.py scripts/generate_manifest.py scripts/package_release.py tests/nacp_language_test.py tests/hbmenu_layout_test.py tests/webdav_put_server.py tests/webdav_range_server.py
 echo "host regression checks: PASS"

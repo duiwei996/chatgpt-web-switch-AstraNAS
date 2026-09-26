@@ -82,11 +82,8 @@ namespace tin::install::xci
             ncmU64ToContentInfoSize(cnmtNcaSize, &cnmtContentInfo);
             cnmtContentInfo.content_type = NcmContentType_Meta;
 
-            this->InstallNcaTracked(cnmtContentInfo);
-            nx::ncm::ContentStorage contentStorage(m_destStorageId);
-            std::string cnmtNCAFullPath = contentStorage.GetPath(cnmtContentId);
-
-            CNMTList.push_back( { tin::util::GetContentMetaFromNCA(cnmtNCAFullPath), cnmtContentInfo } );
+            // Keep XCI/XCZ on the same verified CNMT recovery path as NSP/NSZ.
+            CNMTList.push_back( { this->InstallAndReadCnmtWithRepair(cnmtContentInfo), cnmtContentInfo } );
         }
         
         return CNMTList;

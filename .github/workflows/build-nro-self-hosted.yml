@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  ASTRANAS_VERSION: "1.0.0"
+  ASTRANAS_VERSION: "1.0.1"
 
 jobs:
   build-self-hosted:
@@ -37,13 +37,17 @@ jobs:
           test -s dist/switch/AstraNAS/AstraNAS.nro
           test -s dist/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
           python3 scripts/check_nro_bundle.py dist "$ASTRANAS_VERSION"
-          sha256sum dist/switch/AstraNAS/AstraNAS.nro dist/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro > dist/NRO-SHA256SUMS.txt
+          python3 scripts/package_release.py --root . --dist dist --version "$ASTRANAS_VERSION" --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: AstraNAS-v${{ env.ASTRANAS_VERSION }}-self-hosted-${{ github.sha }}
           path: |
             dist/switch/AstraNAS/AstraNAS.nro
             dist/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
+            dist/AstraNAS-source.zip
+            dist/config.example.ini
+            dist/BUILD-MANIFEST.txt
             dist/NRO-SHA256SUMS.txt
+            dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 1

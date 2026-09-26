@@ -87,13 +87,10 @@ namespace tin::install::nsp
             ncmU64ToContentInfoSize(cnmtNcaSize, &cnmtContentInfo);
             cnmtContentInfo.content_type = NcmContentType_Meta;
 
-            // The CNMT NCA must be registered temporarily so FS can mount it,
-            // but it is tracked and removed if the transaction later fails.
-            this->InstallNcaTracked(cnmtContentInfo);
-            nx::ncm::ContentStorage contentStorage(m_destStorageId);
-            std::string cnmtNCAFullPath = contentStorage.GetPath(cnmtContentId);
-
-            CNMTList.push_back( { tin::util::GetContentMetaFromNCA(cnmtNCAFullPath), cnmtContentInfo } );
+            // Prepare needs a mounted CNMT. Reuse a healthy registered CNMT, but
+            // automatically replace stale/corrupt content from the verified package
+            // before retrying the mount.
+            CNMTList.push_back( { this->InstallAndReadCnmtWithRepair(cnmtContentInfo), cnmtContentInfo } );
         }
 
         return CNMTList;

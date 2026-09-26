@@ -34,7 +34,9 @@ SOFTWARE.
 #include <vector>
 
 #include "nx/ncm.hpp"
+#include "util/config.hpp"
 #include "util/error.hpp"
+#include "util/file_util.hpp"
 #include "util/title_util.hpp"
 
 namespace tin::install
