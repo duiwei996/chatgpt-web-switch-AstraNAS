@@ -33,7 +33,7 @@ grep -q 'NcmContentMetaType_AddOnContent' source/installed/catalog.cpp
 grep -q 'nsextInitialize' source/app/runtime_services.cpp
 grep -q 'nsextExit' source/app/runtime.cpp
 grep -q 'http_context' source/app/util.cpp
-grep -q '下载写入后本机目录回读未发现文件' source/app/runtime_files.cpp
+grep -q '本机文件回读不完整' source/app/runtime_files.cpp
 ! grep -q 'shorten_utf8_middle' source/download_cache.cpp
 ! grep -q 'kMaxVisibleNameBytes\|kSwitchPathBudget' source/download_cache.cpp
 grep -q 'name == ".astranas-transfer"' source/download_cache.cpp
