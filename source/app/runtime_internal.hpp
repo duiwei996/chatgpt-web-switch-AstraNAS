@@ -62,7 +62,7 @@ private:
     void persist_remote_state();
     bool validate_remote_state();
     void restore_remote_selection();
-    void refresh_local();
+    bool refresh_local();
     void refresh_cache();
     void load_installed_cache();
     void refresh_installed_live();

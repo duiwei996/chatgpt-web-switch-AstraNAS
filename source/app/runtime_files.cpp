@@ -343,15 +343,13 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
         return selected;
     };
 
-    enum class RemoteFileAction { Download, DownloadInstall, Install, Benchmark, Delete };
+    enum class RemoteFileAction { Download, Install, Benchmark, Delete };
     std::vector<std::string> labels;
     std::vector<RemoteFileAction> actions;
     labels.push_back("下载到本机当前目录"); actions.push_back(RemoteFileAction::Download);
     if (detect_install_candidate(entry.path) != InstallCandidateKind::None) {
         labels.push_back(config_.network_direct_install ? "网络直装" : "暂存并安装");
         actions.push_back(RemoteFileAction::Install);
-        labels.push_back("下载到本机后安装");
-        actions.push_back(RemoteFileAction::DownloadInstall);
     }
     labels.push_back("测速"); actions.push_back(RemoteFileAction::Benchmark);
     labels.push_back("删除"); actions.push_back(RemoteFileAction::Delete);
@@ -395,42 +393,6 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
                 }
             } else {
                 local_loaded_ = false;
-            }
-            break;
-        }
-        case RemoteFileAction::DownloadInstall: {
-            if (!transfer_remote_file(*remote_, entry, transfer_config, destination, ctx,
-                                      status_, "正在下载到本机后安装")) {
-                local_loaded_ = false;
-                break;
-            }
-            const bool exists = local_path_exists(destination);
-            const std::uint64_t actual_size = exists ? local_file_size(destination) : 0;
-            if (!exists || (entry.size != 0 && actual_size != entry.size)) {
-                status_ = "下载结束，但最终本机文件未通过 stat/大小回读校验：" + destination;
-                append_debug_log("下载后安装前本机文件回读失败",
-                    "expected_size=" + std::to_string(entry.size) +
-                    "\nactual_size=" + std::to_string(actual_size) + "\n" +
-                    local_path_diagnostic(destination));
-                refresh_local_and_select(destination);
-                break;
-            }
-
-            const InstallResult result = install_from_path(
-                destination, config_, ctx, status_, config_.delete_source_after_install);
-            const std::string install_status = status_;
-            const bool still_exists = local_path_exists(destination);
-            const bool listed = refresh_local_and_select(still_exists ? destination : std::string{});
-            status_ = install_status;
-            if (still_exists) {
-                status_ += "；本机文件：" + destination;
-                if (!listed) {
-                    status_ += "（目录回读未列出，详情已写入日志）";
-                    append_debug_log("下载后安装的本机目录回读失败",
-                        "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
-                        "\ninstall_result=" + std::to_string(static_cast<int>(result)) + "\n" +
-                        local_path_diagnostic(destination));
-                }
             }
             break;
         }

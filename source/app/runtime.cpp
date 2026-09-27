@@ -82,8 +82,7 @@ bool Runtime::run_deferred_page_load() {
         return true;
     }
     if (tab_ == Tab::Local && !local_loaded_) {
-        refresh_local();
-        status_ = "本机文件：按 A 打开文件操作菜单";
+        if (refresh_local()) status_ = "本机文件：按 A 打开文件操作菜单";
         dirty_ = true;
         return true;
     }

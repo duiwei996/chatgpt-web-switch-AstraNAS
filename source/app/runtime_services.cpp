@@ -129,15 +129,16 @@ void Runtime::restore_remote_selection() {
 }
 
 void Runtime::validate_local_state() {
+    if (local_root_.empty()) local_root_ = "sdmc:/";
     if (local_root_ == "sdmc:/") {
         if (!local_path_is_within(local_root_, local_dir_) || !local_path_exists(local_dir_)) local_dir_ = "sdmc:/";
         return;
     }
     ensure_usb();
-    const auto locations = local_locations(usb_ready_);
-    const auto found = std::find_if(locations.begin(), locations.end(), [&](const auto& item) { return item.root == local_root_; });
-    if (found == locations.end()) { local_root_ = "sdmc:/"; local_dir_ = "sdmc:/"; }
-    else if (!local_path_is_within(local_root_, local_dir_) || !local_path_exists(local_dir_)) local_dir_ = local_root_;
+    // A removable USB mount can appear after the app starts. Do not silently
+    // replace its saved root with SD: that would hide completed downloads and
+    // overwrite the only persisted path to them.
+    if (!local_path_is_within(local_root_, local_dir_)) local_dir_ = local_root_;
 }
 void Runtime::persist_local_state() {
     config_.local_dir = local_dir_;
@@ -145,15 +146,26 @@ void Runtime::persist_local_state() {
     std::string error;
     if (!save_config(kConfigPath, config_, error)) append_debug_log("保存本机浏览位置", error);
 }
-void Runtime::refresh_local() {
+bool Runtime::refresh_local() {
     validate_local_state();
     std::string error;
     local_entries_.clear();
-    if (!list_local_dir(local_dir_, local_entries_, error)) status_ = friendly_error("读取本机目录失败", error);
-    else local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(), [](const auto& entry) { return is_transfer_sidecar_name(entry.name); }), local_entries_.end());
+    const bool listed = list_local_dir(local_dir_, local_entries_, error);
+    if (!listed) {
+        if (local_location_label(local_root_, usb_ready_) == "设备已移除") {
+            append_debug_log("本机存储设备当前不可用，已保留原保存位置",
+                "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ + "\n" + error);
+            status_ = "上次使用的本机存储当前未就绪，已保留路径；连接设备后刷新：" + local_dir_;
+        } else {
+            status_ = friendly_error("读取本机目录失败", error);
+        }
+    } else {
+        local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(), [](const auto& entry) { return is_transfer_sidecar_name(entry.name); }), local_entries_.end());
+    }
     local_selection_.erase(std::remove_if(local_selection_.begin(), local_selection_.end(), [](const std::string& path) { return !local_path_exists(path); }), local_selection_.end());
     persist_local_state();
     local_loaded_ = true;
+    return listed;
 }
 void Runtime::refresh_cache() {
     std::string error;
