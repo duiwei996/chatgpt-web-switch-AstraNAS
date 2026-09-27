@@ -251,11 +251,14 @@
             }
             const bool registeredContentIdMatches =
                 registeredAudit.find("content_id_match=yes") != std::string::npos;
-            const bool hierarchicalHashFailure =
+            const bool filesystemMountRejected =
                 mountFailure.find("0x001fd602") != std::string::npos;
-            if (registeredContentIdMatches && hierarchicalHashFailure)
-                THROW_FORMAT("Horizon rejected the registered CNMT NCA filesystem hierarchical SHA-256 (0x001fd602 / 2002-4075). The registered Content ID prefix matches; compare source_audit.entry_body_sha256 with registered_audit.registered_body_sha256 to check copied NCA payload bytes without the canonicalized header. mount=[%s]; registered_audit=[%s]",
-                             mountFailure.c_str(), registeredAudit.c_str());
+            if (registeredContentIdMatches && filesystemMountRejected) {
+                const u64 registeredSize = storage.GetSize(contentInfo.content_id);
+                THROW_FORMAT("Horizon reported a CNMT NCA hierarchical SHA-256 verification failure while opening the registered filesystem (0x001fd602 / 2002-4075). The registered Content ID matches. This byte audit does not validate the encrypted PFS0 data/hash-table chain; compare the exact package, target storage, and prior-registration state with a known-working installer. [storage_id=%u existed_before=%s expected_size=0x%lx registered_size=0x%lx mount=[%s] registered_audit=[%s]]",
+                             static_cast<unsigned>(m_destStorageId), existedBefore ? "yes" : "no",
+                             expectedSize, registeredSize, mountFailure.c_str(), registeredAudit.c_str());
+            }
             if (existedBefore)
                 THROW_FORMAT("Existing CNMT was replaced with verified package content but mount still failed; before=%s; after=%s; registered_audit=[%s]",
                              existingFailure.c_str(), mountFailure.c_str(), registeredAudit.c_str());

@@ -33,6 +33,14 @@ bool parse_bool(const std::string& value, bool fallback) {
     return fallback;
 }
 
+bool path_at_or_below(const std::string& candidate, const std::string& root) {
+    if (candidate == root) return true;
+    if (root.empty()) return false;
+    std::string prefix = root;
+    if (prefix.back() != '/') prefix.push_back('/');
+    return candidate.rfind(prefix, 0) == 0;
+}
+
 bool commit_config_filesystem(const std::string& path, std::string& error) {
 #ifdef __SWITCH__
     const std::size_t separator = path.find(":/");
@@ -300,7 +308,12 @@ bool load_config(const std::string& path, AppConfig& out, std::string& error) {
         else if (key == "local_dir") out.local_dir = value;
         else if (key == "local_root") out.local_root = value;
         else if (key == "local_focus_path") out.local_focus_path = value;
-        else if (key == "cache_dir") out.cache_dir = value;
+        else if (key == "local_download_path" && !value.empty()) {
+            if (std::find(out.local_download_paths.begin(), out.local_download_paths.end(), value) ==
+                    out.local_download_paths.end() &&
+                out.local_download_paths.size() < kMaxRememberedLocalDownloads)
+                out.local_download_paths.push_back(value);
+        } else if (key == "cache_dir") out.cache_dir = value;
         else if (key == "download_retries") out.download_retries = parse_int(value, out.download_retries, 0, 5);
         else if (key == "network_direct_install") out.network_direct_install = parse_bool(value, out.network_direct_install);
         else if (key == "verify_sha256") out.verify_sha256 = parse_bool(value, out.verify_sha256);
@@ -382,6 +395,9 @@ bool save_config(const std::string& path, const AppConfig& input, std::string& e
         << "ignore_required_firmware=" << (config.ignore_required_firmware ? "true" : "false") << "\n"
         << "validate_nca=" << (config.validate_nca ? "true" : "false") << "\n";
 
+    for (const auto& downloadPath : config.local_download_paths)
+        if (!downloadPath.empty()) out << "local_download_path=" << downloadPath << "\n";
+
     out.flush();
     if (!out) {
         out.close();
@@ -429,6 +445,36 @@ bool save_config(const std::string& path, const AppConfig& input, std::string& e
     }
     error.clear();
     return true;
+}
+
+void remember_local_download_path(AppConfig& config, const std::string& path) {
+    if (path.empty()) return;
+    config.local_download_paths.erase(
+        std::remove(config.local_download_paths.begin(), config.local_download_paths.end(), path),
+        config.local_download_paths.end());
+    config.local_download_paths.push_back(path);
+    if (config.local_download_paths.size() > kMaxRememberedLocalDownloads)
+        config.local_download_paths.erase(
+            config.local_download_paths.begin(),
+            config.local_download_paths.begin() +
+                static_cast<std::ptrdiff_t>(config.local_download_paths.size() -
+                                            kMaxRememberedLocalDownloads));
+}
+
+void forget_local_downloads_at_or_below(AppConfig& config, const std::string& root) {
+    config.local_download_paths.erase(
+        std::remove_if(config.local_download_paths.begin(), config.local_download_paths.end(),
+                       [&](const std::string& path) { return path_at_or_below(path, root); }),
+        config.local_download_paths.end());
+}
+
+void relocate_local_downloads_at_or_below(AppConfig& config, const std::string& oldRoot,
+                                          const std::string& newRoot) {
+    if (oldRoot.empty() || newRoot.empty() || oldRoot == newRoot) return;
+    for (auto& path : config.local_download_paths) {
+        if (!path_at_or_below(path, oldRoot)) continue;
+        path = newRoot + path.substr(oldRoot.size());
+    }
 }
 
 bool write_example_config(const std::string& path, std::string& error) {

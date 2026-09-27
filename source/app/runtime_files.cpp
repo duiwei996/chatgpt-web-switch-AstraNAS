@@ -366,6 +366,8 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
     switch (actions[static_cast<std::size_t>(choice)]) {
         case RemoteFileAction::Download: {
             if (transfer_remote_file(*remote_, entry, transfer_config, destination, ctx, status_, "正在下载到本机当前目录")) {
+                remember_local_download_path(config_, destination);
+                persist_local_state();
                 const std::string completed = status_;
                 const bool listed = refresh_local_and_select(destination);
                 const bool exists = local_path_exists(destination);
@@ -452,6 +454,7 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
         if (!delete_local_entry(local_root_, entry, error)) { status_ = friendly_error("删除失败", error); return; }
         std::remove((entry.path + ".astranas-meta").c_str());
         local_selected_by_dir_.erase(local_dir_);
+        forget_local_downloads_at_or_below(config_, entry.path);
         if (path_at_or_below(config_.local_focus_path, entry.path)) config_.local_focus_path.clear();
         local_selection_.erase(std::remove_if(local_selection_.begin(), local_selection_.end(),
             [&](const auto& path) { return path_at_or_below(path, entry.path); }), local_selection_.end());
@@ -468,6 +471,7 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
         std::string destination, error;
         const std::string moved_name = move_source_.name;
         if (move_local_entry(move_source_root_, local_root_, move_source_, local_dir_, destination, error)) {
+            relocate_local_downloads_at_or_below(config_, move_source_.path, destination);
             const std::string source_parent = local_parent_directory(move_source_.path);
             const auto old_selection = local_selected_by_dir_.find(source_parent);
             if (old_selection != local_selected_by_dir_.end() && old_selection->second == move_source_.path)

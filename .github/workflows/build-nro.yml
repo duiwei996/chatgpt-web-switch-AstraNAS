@@ -2,8 +2,8 @@ name: Build AstraNAS NRO
 
 on:
   workflow_dispatch:
-  # One-shot authorized v1.1.3 delivery build. The job guard below only accepts
-  # the transition from the v1.1.2 commit, so later main pushes stay manual.
+  # One-shot authorized v1.1.13 delivery build. The job guard below only accepts
+  # the transition from the v1.1.12 commit, so later main pushes stay manual.
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  ASTRANAS_VERSION: "1.1.12"
+  ASTRANAS_VERSION: "1.1.13"
   LIBSMB2_COMMIT: "0b2aa4310c7a0510c666fe7da0eebce0f7e93824"
   LIBUSBHSFS_COMMIT: "3b897ed6a79c910aa3f13693f17b80afb802b3b5"
   TOOLCHAIN_BRIDGE_REPO: "duiwei996/chatgpt-web-github-actions-DownloadBridge"
@@ -25,7 +25,7 @@ env:
 
 jobs:
   host-test:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == 'e00a1ca673ed4adffd4a04474c21a48a16fe6d45')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == '64dff04ee1d80a98d8690e8d92870424953277bf')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -38,7 +38,7 @@ jobs:
         run: ./scripts/run_host_tests.sh
 
   build:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == 'e00a1ca673ed4adffd4a04474c21a48a16fe6d45')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == '64dff04ee1d80a98d8690e8d92870424953277bf')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

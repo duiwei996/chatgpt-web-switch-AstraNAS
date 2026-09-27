@@ -162,6 +162,32 @@ bool Runtime::refresh_local() {
         }
     } else {
         local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(), [](const auto& entry) { return is_transfer_sidecar_name(entry.name); }), local_entries_.end());
+        // Directory enumeration can omit a valid UTF-8 name on a later refresh.
+        // Keep every completed download reachable across folder navigation and app restarts.
+        for (const auto& path : config_.local_download_paths) {
+            if (local_parent_directory(path) != local_dir_ ||
+                !local_path_is_within(local_root_, path) ||
+                is_transfer_sidecar_name(basename_of(path)))
+                continue;
+            const auto listedPath = std::find_if(local_entries_.begin(), local_entries_.end(),
+                [&](const LocalEntry& entry) { return entry.path == path; });
+            if (listedPath != local_entries_.end()) continue;
+            if (!local_path_exists(path)) {
+                append_debug_log("已记录的本机下载路径暂不可回读",
+                    "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                    "\n" + local_path_diagnostic(path));
+                continue;
+            }
+            LocalEntry fallback{};
+            fallback.name = basename_of(path);
+            fallback.path = path;
+            fallback.size = local_file_size(path);
+            fallback.is_dir = false;
+            local_entries_.push_back(std::move(fallback));
+            append_debug_log("目录枚举未返回已下载文件，按持久路径补入列表",
+                "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                "\n" + local_path_diagnostic(path));
+        }
         const auto remembered = local_selected_by_dir_.find(local_dir_);
         std::string restore_path;
         bool restore_from_config = false;

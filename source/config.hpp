@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <cstddef>
 #include <string>
+#include <vector>
+
+inline constexpr std::size_t kMaxRememberedLocalDownloads = 64;
 
 struct SmbProfileConfig {
     std::string server;
@@ -46,6 +50,7 @@ struct AppConfig {
     std::string local_dir = "sdmc:/";
     std::string local_root = "sdmc:/";
     std::string local_focus_path;
+    std::vector<std::string> local_download_paths;
     std::string cache_dir = "sdmc:/switch/AstraNAS/cache";
     int download_retries = 2;
     bool network_direct_install = true;
@@ -66,4 +71,8 @@ void set_active_protocol(AppConfig& config, const std::string& protocol);
 void normalize_config_endpoint(AppConfig& config);
 bool load_config(const std::string& path, AppConfig& out, std::string& error);
 bool save_config(const std::string& path, const AppConfig& config, std::string& error);
+void remember_local_download_path(AppConfig& config, const std::string& path);
+void forget_local_downloads_at_or_below(AppConfig& config, const std::string& root);
+void relocate_local_downloads_at_or_below(AppConfig& config, const std::string& old_root,
+                                          const std::string& new_root);
 bool write_example_config(const std::string& path, std::string& error);
