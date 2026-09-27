@@ -14,6 +14,7 @@ struct LocalEntry {
 bool local_path_exists(const std::string& path);
 bool local_mkdir_p(const std::string& path);
 bool list_local_dir(const std::string& path, std::vector<LocalEntry>& entries, std::string& error);
+bool local_commit_filesystem(const std::string& path, std::string& error);
 std::string local_join_path(const std::string& parent, const std::string& child);
 std::string local_parent_directory(const std::string& path);
 std::string local_path_diagnostic(const std::string& path);

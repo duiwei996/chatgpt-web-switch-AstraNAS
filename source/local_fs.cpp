@@ -10,6 +10,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef __SWITCH__
+#include <switch/runtime/devices/fs_dev.h>
+#endif
+
 namespace {
 std::string trim_trailing_slash(std::string p) {
     while (p.size() > 1 && p.back() == '/') p.pop_back();
@@ -228,6 +232,27 @@ bool list_local_dir(const std::string& path, std::vector<LocalEntry>& entries, s
     return true;
 }
 
+bool local_commit_filesystem(const std::string& path, std::string& error) {
+    error.clear();
+#ifdef __SWITCH__
+    const std::size_t separator = path.find(":/");
+    if (separator == std::string::npos || separator == 0) return true;
+
+    const std::string device = path.substr(0, separator);
+    const Result rc = fsdevCommitDevice(device.c_str());
+    if (R_FAILED(rc)) {
+        std::ostringstream out;
+        out << "fsdevCommitDevice(" << device << ") failed (0x"
+            << std::hex << static_cast<u32>(rc) << ")";
+        error = out.str();
+        return false;
+    }
+#else
+    (void)path;
+#endif
+    return true;
+}
+
 bool local_path_is_within(const std::string& root, const std::string& path) {
     const std::string r = trim_trailing_slash(root);
     const std::string p = trim_trailing_slash(path);
@@ -293,6 +318,7 @@ bool copy_local_file(const std::string& source, const std::string& destination, 
         return false;
     }
     (void)rmdir(state_dir.c_str());
+    if (!local_commit_filesystem(destination, error)) return false;
     return true;
 }
 

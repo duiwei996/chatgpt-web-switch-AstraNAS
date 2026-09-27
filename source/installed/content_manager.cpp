@@ -3,6 +3,7 @@
 #ifdef __SWITCH__
 
 #include "nx/ipc/tin_ipc.h"
+#include "util/title_util.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -434,15 +435,56 @@ bool load_records_for_action(u64 application_id,
 bool list_dlc(std::uint64_t application_id, std::vector<ManagedContentMeta>& entries,
               std::string& error) {
     entries.clear();
-    std::vector<ContentStorageRecord> records;
-    if (!load_records_for_action(application_id, records, error)) return false;
-    for (const auto& record : records) {
-        if (record.metaRecord.type != NcmContentMetaType_AddOnContent) continue;
+    error.clear();
+
+    s32 count = 0;
+    Result rc = nsCountApplicationContentMeta(application_id, &count);
+    if (R_FAILED(rc)) {
+        error = result_text("无法读取应用内容数量", rc);
+        return false;
+    }
+    if (count < 0 || count > kMaxApplicationRecords) {
+        error = "应用内容记录数量异常";
+        return false;
+    }
+    if (count == 0) return true;
+
+    // NS's status list is the authoritative installed-DLC list. The status
+    // application_id is the add-on's own title ID, not the selected base game's
+    // ID, so resolve ownership by the standard DLC title-ID mapping and avoid
+    // requiring NS ApplicationRecord or a count-perfect NCM index reconciliation.
+    std::vector<NsApplicationContentMetaStatus> statuses(static_cast<std::size_t>(count));
+    s32 written = 0;
+    rc = nsListApplicationContentMetaStatus(
+        application_id, 0, statuses.data(), count, &written);
+    if (R_FAILED(rc)) {
+        error = result_text("无法读取应用内容状态", rc);
+        return false;
+    }
+    if (written != count) {
+        error = "DLC 内容状态在读取过程中发生变化";
+        return false;
+    }
+
+    std::set<std::tuple<u64, u32, u8>> seen;
+    for (const auto& status : statuses) {
+        if (status.meta_type != NcmContentMetaType_AddOnContent ||
+            status.application_id == 0 ||
+            status.storageID == NcmStorageId_None ||
+            status.storageID >= NcmStorageId_Any ||
+            tin::util::GetBaseTitleId(
+                status.application_id, NcmContentMetaType_AddOnContent) != application_id)
+            continue;
+
+        const auto identity = std::make_tuple(
+            status.application_id, status.version, status.storageID);
+        if (!seen.insert(identity).second) continue;
+
         ManagedContentMeta item{};
-        item.id = record.metaRecord.id;
-        item.version = record.metaRecord.version;
-        item.type = static_cast<NcmContentMetaType>(record.metaRecord.type);
-        item.storage = static_cast<NcmStorageId>(record.storageId);
+        item.id = status.application_id;
+        item.version = status.version;
+        item.type = NcmContentMetaType_AddOnContent;
+        item.storage = static_cast<NcmStorageId>(status.storageID);
         entries.push_back(item);
     }
     std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {

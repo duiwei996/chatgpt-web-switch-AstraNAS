@@ -673,14 +673,18 @@ void NcaWriter::flushHeader() {
                                         static_cast<std::size_t>(m_ncaSize));
 
     tin::install::NcaHeader header = decoded.header;
+    const bool needsHeaderRewrite = m_headerPlaintext || header.distribution == 1;
     if (header.distribution == 1) header.distribution = 0;
 
-    // NCM expects the canonical encrypted NCA header. Encrypted input is
-    // normalized after decryption; plaintext input is encrypted here for the
-    // first time. Bytes after 0xC00 in the prefix are preserved verbatim.
-    Crypto::Keys keys;
-    Crypto::AesXtr encryptor(keys.headerKey, true);
-    encryptor.encrypt(m_buffer.data(), &header, sizeof(header), 0, 0x200);
+    // Keep a valid encrypted NSP header byte-for-byte. A decrypt/re-encrypt
+    // round trip is unnecessary unless converting a gamecard NCA or encrypting
+    // a plaintext header, and can disturb the filesystem-header hash material.
+    // Gamecard-to-NCM conversion retains AtmoXL's distribution-flag rewrite.
+    if (needsHeaderRewrite) {
+        Crypto::Keys keys;
+        Crypto::AesXtr encryptor(keys.headerKey, true);
+        encryptor.encrypt(m_buffer.data(), &header, sizeof(header), 0, 0x200);
+    }
 
     // A plaintext package header cannot be validated against its content ID until
     // it has been normalized back to the encrypted on-storage representation.

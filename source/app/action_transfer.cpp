@@ -327,6 +327,14 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
             // Remove legacy v1.0.x/v1.1.x sidecars if they exist next to the file.
             std::remove((destination + ".astranas-meta").c_str());
             (void)rmdir(state.directory.c_str());
+            std::string commit_error;
+            if (!local_commit_filesystem(destination, commit_error)) {
+                status = "文件已写入，但本机存储目录提交失败；目标：" + destination;
+                append_debug_log("下载后提交本机文件系统失败",
+                    "destination=" + destination + "\n" + commit_error + "\n" +
+                    local_path_diagnostic(destination));
+                return false;
+            }
             if (replacing) append_debug_log("覆盖本机同名文件", destination);
             status = std::string(phase) + "完成：" + basename_of(destination) + "（" + format_size(final_size) + "）";
             return true;

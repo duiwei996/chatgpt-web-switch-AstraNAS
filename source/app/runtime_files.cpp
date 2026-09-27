@@ -270,20 +270,77 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
     AppConfig transfer_config = config_;
     transfer_config.local_root = local_root_;
     transfer_config.local_dir = local_dir_;
+    const std::string target_local_root = local_root_;
     const std::string local_name = remote_cache_filename(transfer_config, entry);
     const std::string destination = local_join_path(local_dir_, local_name);
+    bool used_stat_fallback = false;
     auto refresh_local_and_select = [&](const std::string& path) {
+        used_stat_fallback = false;
         refresh_local();
-        const auto found = std::find_if(local_entries_.begin(), local_entries_.end(),
-            [&](const LocalEntry& item) { return item.path == path; });
-        if (found != local_entries_.end())
+        const std::string target_parent = path.empty() ? std::string{} : local_parent_directory(path);
+        const std::string target_name = path.empty() ? std::string{} : basename_of(path);
+
+        // Refresh validation can fall back to SD if a removable mount briefly
+        // fails its location probe. Keep the just-written file's selected root
+        // and directory when its final path is still readable there.
+        if (!path.empty() && local_path_exists(target_parent) &&
+            local_path_is_within(target_local_root, target_parent) &&
+            (local_root_ != target_local_root || local_dir_ != target_parent)) {
+            local_root_ = target_local_root;
+            local_dir_ = target_parent;
+            local_entries_.clear();
+            std::string list_error;
+            if (list_local_dir(local_dir_, local_entries_, list_error)) {
+                local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(),
+                    [](const auto& item) { return is_transfer_sidecar_name(item.name); }), local_entries_.end());
+            } else {
+                append_debug_log("下载后按目标目录刷新失败",
+                    "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                    "\nlist_error=" + list_error + "\n" + local_path_diagnostic(path));
+            }
+            persist_local_state();
+            local_loaded_ = true;
+        }
+
+        auto found = local_entries_.end();
+        if (!path.empty()) {
+            found = std::find_if(local_entries_.begin(), local_entries_.end(),
+                [&](const LocalEntry& item) { return item.path == path; });
+            if (found == local_entries_.end()) {
+                found = std::find_if(local_entries_.begin(), local_entries_.end(),
+                    [&](const LocalEntry& item) {
+                        return local_parent_directory(item.path) == target_parent &&
+                               lower_copy(item.name) == lower_copy(target_name);
+                    });
+            }
+        }
+
+        bool selected = found != local_entries_.end();
+        if (selected) {
             local_sel_ = static_cast<std::size_t>(std::distance(local_entries_.begin(), found));
-        else if (local_entries_.empty())
-            local_sel_ = 0;
-        else if (local_sel_ >= local_entries_.size())
+        } else if (!path.empty() && local_dir_ == target_parent &&
+                   !is_transfer_sidecar_name(target_name) && local_path_exists(path)) {
+            // A stat-visible file must remain reachable from the UI even if the
+            // current devoptab readdir snapshot omitted the just-published name.
+            LocalEntry fallback{};
+            fallback.name = target_name;
+            fallback.path = path;
+            fallback.size = local_file_size(path);
+            fallback.is_dir = false;
+            local_entries_.push_back(std::move(fallback));
             local_sel_ = local_entries_.size() - 1;
+            selected = true;
+            used_stat_fallback = true;
+            append_debug_log("下载文件以 stat 回读结果补入本机列表",
+                "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                "\n" + local_path_diagnostic(path));
+        } else if (local_entries_.empty()) {
+            local_sel_ = 0;
+        } else if (local_sel_ >= local_entries_.size()) {
+            local_sel_ = local_entries_.size() - 1;
+        }
         set_tab(Tab::Local);
-        return found != local_entries_.end();
+        return selected;
     };
 
     enum class RemoteFileAction { Download, DownloadInstall, Install, Benchmark, Delete };
@@ -324,7 +381,9 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
                     if (local_name != entry.name)
                         status_ += "；原名含本机不兼容字符，已保存为：" + local_name;
                     if (listed) {
-                        status_ += "；已切换到本机目录并定位文件：" + destination;
+                        status_ += used_stat_fallback
+                            ? "；文件路径回读成功，已加入本机列表：" + destination
+                            : "；已切换到本机目录并定位文件：" + destination;
                     } else {
                         status_ += "；文件存在且大小校验通过，但本机目录刷新未定位到它：" + destination;
                         append_debug_log("下载后本机目录未定位文件",
