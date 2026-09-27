@@ -1,8 +1,13 @@
-# AstraNAS v1.1.0
+# AstraNAS v1.1.1
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.1.1 NS 扩展 C ABI 链接修复
+
+- 修正 v1.1.0 新增部分卸载模块直接包含 `ns_ext.h` 时在 C++ 编译单元产生名称修饰，导致最终链接找不到 `nsPushApplicationRecord/nsDeleteApplicationRecord/nsListApplicationRecordContentMeta`。
+- 改为通过项目既有的 `tin_ipc.h` `extern "C"` 包装引入 NS 扩展接口；功能逻辑不变，重新执行完整 host、Switch 双 NRO 与 Artifact 验收。
 
 ## v1.1.0 已安装内容管理、原名覆盖下载与注册后 NCA 审计
 
@@ -213,7 +218,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.1.0 主分支功能交付，GitHub-hosted workflow 保留一个只匹配“v1.0.8 提交 → v1.1.0”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
+两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.1.1 主分支修复交付，GitHub-hosted workflow 保留一个只匹配“v1.1.0 提交 → v1.1.1”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
 
 本地 devkitPro：
 

@@ -18,6 +18,8 @@ grep -q '覆盖本机同名文件' source/app/action_transfer.cpp
 ! grep -q '本机当前目录已有同名文件，且无法确认来自同一个远端对象' source/app/action_transfer.cpp
 grep -q 'source/installed/content_manager.cpp' CMakeLists.txt
 grep -q 'ncmContentMetaDatabaseLookupOrphanContent' source/installed/content_manager.cpp
+grep -q 'nx/ipc/tin_ipc.h' source/installed/content_manager.cpp
+! grep -q 'include.*ns_ext.h' source/installed/content_manager.cpp
 grep -q 'nsPushApplicationRecord' source/installed/content_manager.cpp
 grep -q 'NcmContentMetaType_DataPatch' source/installed/content_manager.cpp
 grep -q '卸载升级包' source/app/runtime_library.cpp
@@ -99,7 +101,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'c5fd847f6ff3902dbc14b67960575dcf863ed587'" .github/workflows/build-nro.yml
+grep -q "github.event.before == '9eeda814367ba0b6989b261420c897a4deb73ccc'" .github/workflows/build-nro.yml
+! grep -q 'c5fd847f6ff3902dbc14b67960575dcf863ed587' .github/workflows/build-nro.yml
 ! grep -q '1b7dca93859f6762a1d97618192d8e46abaace00' .github/workflows/build-nro.yml
 ! grep -q 'b6b8b820a8846e021e9a8f5fca194339c47b1cc8' .github/workflows/build-nro.yml
 ! grep -q 'd0cd5b428d94eb3db6b626e7a81161902fe1fcd6' .github/workflows/build-nro.yml

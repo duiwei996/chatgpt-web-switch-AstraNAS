@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(astranas VERSION 1.1.0 LANGUAGES C CXX)
+project(astranas VERSION 1.1.1 LANGUAGES C CXX)
 
 if(NOT NINTENDO_SWITCH)
     message(FATAL_ERROR

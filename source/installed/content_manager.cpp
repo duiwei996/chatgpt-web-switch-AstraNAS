@@ -2,7 +2,7 @@
 #include "content_manager.hpp"
 #ifdef __SWITCH__
 
-#include "../atmo_xl/include/nx/ipc/ns_ext.h"
+#include "nx/ipc/tin_ipc.h"
 
 #include <algorithm>
 #include <cstring>

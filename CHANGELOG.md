@@ -1,5 +1,10 @@
 # AstraNAS 更新记录
 
+## v1.1.1
+
+- 修复 v1.1.0 部分卸载模块对 NS 扩展函数的 C/C++ linkage：统一通过 `tin_ipc.h` 的 `extern "C"` 包装引用，解决最终链接 undefined reference。
+- 功能逻辑不变；重新执行完整 host regression、Switch 双 NRO build 与 Artifact 验收。
+
 ## v1.1.0
 
 - 已安装应用新增升级包、全部 DLC、单个 DLC 与全部游戏内容四种卸载粒度；部分卸载维护 ContentMeta DB、ApplicationRecord 和 orphan NCA 三层一致性，并带失败恢复。
