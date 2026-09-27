@@ -311,8 +311,8 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
                 const bool exists = local_path_exists(destination);
                 const std::uint64_t actual_size = exists ? local_file_size(destination) : 0;
                 const bool size_matches = entry.size == 0 || actual_size == entry.size;
-                if (!exists || !listed || !size_matches) {
-                    status_ = "下载结束，但本机文件回读不完整；目标：" + destination;
+                if (!exists || !size_matches) {
+                    status_ = "下载结束，但本机文件回读不完整（目标缺失或大小不符）；目标：" + destination;
                     append_debug_log("下载后本机目录回读失败",
                         "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
                         "\nexpected_size=" + std::to_string(entry.size) +
@@ -323,7 +323,16 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
                     status_ = completed;
                     if (local_name != entry.name)
                         status_ += "；原名含本机不兼容字符，已保存为：" + local_name;
-                    status_ += "；已切换到本机目录并定位文件：" + destination;
+                    if (listed) {
+                        status_ += "；已切换到本机目录并定位文件：" + destination;
+                    } else {
+                        status_ += "；文件存在且大小校验通过，但本机目录刷新未定位到它：" + destination;
+                        append_debug_log("下载后本机目录未定位文件",
+                            "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                            "\nexpected_size=" + std::to_string(entry.size) +
+                            "\nactual_size=" + std::to_string(actual_size) + "\n" +
+                            local_path_diagnostic(destination));
+                    }
                 }
             } else {
                 local_loaded_ = false;

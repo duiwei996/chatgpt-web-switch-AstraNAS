@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  ASTRANAS_VERSION: "1.1.6"
+  ASTRANAS_VERSION: "1.1.7"
   LIBSMB2_COMMIT: "0b2aa4310c7a0510c666fe7da0eebce0f7e93824"
   LIBUSBHSFS_COMMIT: "3b897ed6a79c910aa3f13693f17b80afb802b3b5"
   TOOLCHAIN_BRIDGE_REPO: "duiwei996/chatgpt-web-github-actions-DownloadBridge"

@@ -69,10 +69,11 @@ bool list_records(u64 application_id, std::vector<ContentStorageRecord>& records
     std::map<StatusKey, std::vector<NcmContentMetaKey>> candidates_by_status;
     std::set<DatabaseKey> databases;
     for (const auto& status : statuses) {
-        if (status.application_id != application_id) {
-            error = "系统返回了其他应用的内容状态，已停止 DLC 管理";
-            return false;
-        }
+        // nsListApplicationContentMetaStatus is already scoped to the requested
+        // application. Its per-entry application_id may name a linked content
+        // title (not the base title being managed), so do not use that field as
+        // the ownership check. The database scan below is filtered by the exact
+        // requested application_id before any ContentStorageRecord is built.
         if (status.storageID == NcmStorageId_None ||
             status.storageID >= NcmStorageId_Any) {
             error = "应用内容状态包含无效存储位置";

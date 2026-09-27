@@ -52,8 +52,14 @@ std::string friendly_error(const std::string& action, const std::string& raw) {
                               lower.find("response") != std::string::npos;
     if (lower.find("hierarchical sha-256") != std::string::npos ||
         lower.find("0x001fd602") != std::string::npos ||
-        lower.find("2002-4075") != std::string::npos)
-        reason = "系统拒绝打开 NCA 文件系统（层级 SHA-256 校验失败）；请查看源包与注册后 NCA 的 SHA-256 审计";
+        lower.find("2002-4075") != std::string::npos) {
+        if (lower.find("source_vs_registered_body_sha256=different") != std::string::npos)
+            reason = "系统拒绝挂载 CNMT NCA，且源与注册后主体 SHA-256 不同；请查看日志中的审计值，并尝试下载到本机后安装";
+        else if (lower.find("source_vs_registered_body_sha256=match") != std::string::npos)
+            reason = "系统拒绝挂载 CNMT NCA，但源与注册后主体 SHA-256 相同；请查看日志中的头部审计和系统兼容信息";
+        else
+            reason = "系统拒绝挂载 CNMT NCA；源/注册后主体 SHA-256 对照已写入日志";
+    }
     else if (lower.find("安装预读缓冲") != std::string::npos)
         reason = "安装预读缓冲内存不足，请关闭其他程序后重试";
     else if (lower.find("cancel") != std::string::npos) reason = "操作已取消";
