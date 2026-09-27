@@ -45,6 +45,7 @@ struct AppConfig {
     std::string manifest = "library.json";
     std::string local_dir = "sdmc:/";
     std::string local_root = "sdmc:/";
+    std::string local_focus_path;
     std::string cache_dir = "sdmc:/switch/AstraNAS/cache";
     int download_retries = 2;
     bool network_direct_install = true;

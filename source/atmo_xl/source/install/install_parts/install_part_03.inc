@@ -86,9 +86,80 @@
             << " header_mode=" << tin::install::NcaHeaderModeLabel(decoded.mode)
             << " raw_magic=0x" << decoded.rawMagic
             << " decrypted_magic=0x" << decoded.decryptedMagic;
-        if (decoded.mode != tin::install::NcaHeaderMode::Invalid)
+        if (decoded.mode != tin::install::NcaHeaderMode::Invalid) {
             out << " distribution=" << std::dec << static_cast<unsigned>(decoded.header.distribution)
                 << " declared_size=0x" << std::hex << decoded.header.nca_size;
+            const auto bytesToHex = [](const u8* bytes, size_t length) {
+                static constexpr char digits[] = "0123456789abcdef";
+                std::string value;
+                value.reserve(length * 2);
+                for (size_t i = 0; i < length; ++i) {
+                    value.push_back(digits[bytes[i] >> 4]);
+                    value.push_back(digits[bytes[i] & 0x0f]);
+                }
+                return value;
+            };
+            const auto readLe32 = [](const u8* bytes) -> u32 {
+                return static_cast<u32>(bytes[0]) |
+                       (static_cast<u32>(bytes[1]) << 8) |
+                       (static_cast<u32>(bytes[2]) << 16) |
+                       (static_cast<u32>(bytes[3]) << 24);
+            };
+            const auto readLe64 = [&](const u8* bytes) -> u64 {
+                return static_cast<u64>(readLe32(bytes)) |
+                       (static_cast<u64>(readLe32(bytes + 4)) << 32);
+            };
+            const auto rangeFits = [](u64 offset, u64 length, u64 limit) {
+                return offset <= limit && length <= limit - offset;
+            };
+
+            const auto* expectedSectionHashes = decoded.header.section_hashes;
+            for (size_t i = 0; i < 4; ++i) {
+                const auto& section = decoded.header.section_entries[i];
+                if (section.media_start_offset == section.media_end_offset) continue;
+
+                const u64 sectionBegin = static_cast<u64>(section.media_start_offset) * 0x200;
+                const u64 sectionEnd = static_cast<u64>(section.media_end_offset) * 0x200;
+                const bool sectionBounds = sectionBegin < sectionEnd && sectionEnd <= size;
+                const auto& fsHeader = decoded.header.fs_headers[i];
+                const std::string actualFsHeaderHash = sha256_bytes(&fsHeader, sizeof(fsHeader));
+                const std::string expectedFsHeaderHash = bytesToHex(expectedSectionHashes + i * 0x20, 0x20);
+
+                out << " section" << std::dec << i
+                    << "_range=0x" << std::hex << sectionBegin << "-0x" << sectionEnd
+                    << "_bounds=" << (sectionBounds ? "pass" : "fail")
+                    << "_partition_type=" << std::dec << static_cast<unsigned>(fsHeader.partition_type)
+                    << "_fs_type=" << static_cast<unsigned>(fsHeader.fs_type)
+                    << "_crypt_type=" << static_cast<unsigned>(fsHeader.crypt_type)
+                    << "_fs_header_sha256=" << actualFsHeaderHash
+                    << "_expected_section_sha256=" << expectedFsHeaderHash
+                    << "_section_header_hash=" << (actualFsHeaderHash == expectedFsHeaderHash ? "match" : "different");
+
+                // PFS0's superblock stores the expected master hash and the
+                // hash-table/PFS0 ranges. Log these independently from the outer
+                // NCA digest so a Horizon HFS rejection can be diagnosed without
+                // treating byte-for-byte transport equality as tree validation.
+                if (fsHeader.partition_type == 1 && fsHeader.fs_type == 2) {
+                    const u8* superblock = fsHeader.superblock_data;
+                    const u32 blockSize = readLe32(superblock + 0x20);
+                    const u64 hashTableOffset = readLe64(superblock + 0x28);
+                    const u64 hashTableSize = readLe64(superblock + 0x30);
+                    const u64 pfs0Offset = readLe64(superblock + 0x38);
+                    const u64 pfs0Size = readLe64(superblock + 0x40);
+                    const u64 sectionSize = sectionBounds ? sectionEnd - sectionBegin : 0;
+                    const bool pfsBounds = sectionBounds &&
+                        rangeFits(hashTableOffset, hashTableSize, sectionSize) &&
+                        rangeFits(pfs0Offset, pfs0Size, sectionSize);
+                    out << "_pfs0_master_hash=" << bytesToHex(superblock, 0x20)
+                        << "_pfs0_block_size=0x" << std::hex << blockSize
+                        << "_pfs0_hash_table_offset=0x" << hashTableOffset
+                        << "_pfs0_hash_table_size=0x" << hashTableSize
+                        << "_pfs0_data_offset=0x" << pfs0Offset
+                        << "_pfs0_data_size=0x" << pfs0Size
+                        << "_pfs0_metadata_bounds=" << (pfsBounds ? "pass" : "fail");
+                }
+            }
+        }
         return out.str();
     }
 

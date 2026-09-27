@@ -39,6 +39,7 @@ private:
     std::vector<RemoteDirEntry> remote_entries_;
     std::vector<RemoteInstallQueueEntry> install_queue_;
     std::vector<LocalEntry> local_entries_,cache_entries_;
+    std::map<std::string,std::string> local_selected_by_dir_;
     LocalEntry move_source_{};
     std::string move_source_root_;
     bool move_pending_=false;

@@ -339,6 +339,11 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
         } else if (local_sel_ >= local_entries_.size()) {
             local_sel_ = local_entries_.size() - 1;
         }
+        if (selected && !path.empty()) {
+            local_selected_by_dir_[local_dir_] = path;
+            config_.local_focus_path = path;
+            persist_local_state();
+        }
         set_tab(Tab::Local);
         return selected;
     };
@@ -446,6 +451,8 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
         std::string error;
         if (!delete_local_entry(local_root_, entry, error)) { status_ = friendly_error("删除失败", error); return; }
         std::remove((entry.path + ".astranas-meta").c_str());
+        local_selected_by_dir_.erase(local_dir_);
+        if (path_at_or_below(config_.local_focus_path, entry.path)) config_.local_focus_path.clear();
         local_selection_.erase(std::remove_if(local_selection_.begin(), local_selection_.end(),
             [&](const auto& path) { return path_at_or_below(path, entry.path); }), local_selection_.end());
         if (move_pending_ && path_at_or_below(move_source_.path, entry.path)) {
@@ -461,9 +468,15 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
         std::string destination, error;
         const std::string moved_name = move_source_.name;
         if (move_local_entry(move_source_root_, local_root_, move_source_, local_dir_, destination, error)) {
+            const std::string source_parent = local_parent_directory(move_source_.path);
+            const auto old_selection = local_selected_by_dir_.find(source_parent);
+            if (old_selection != local_selected_by_dir_.end() && old_selection->second == move_source_.path)
+                local_selected_by_dir_.erase(old_selection);
             local_selection_.erase(std::remove_if(local_selection_.begin(), local_selection_.end(),
                 [&](const auto& path) { return path_at_or_below(path, move_source_.path); }), local_selection_.end());
             move_pending_ = false; move_source_ = {}; move_source_root_.clear();
+            local_selected_by_dir_[local_dir_] = destination;
+            config_.local_focus_path = destination;
             refresh_local();
             status_ = "已移动到当前目录：" + moved_name;
         } else status_ = friendly_error("移动失败", error);
@@ -471,14 +484,30 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
 
     const u64 down = frame.down;
     if (move_pending_ && ((down & HidNpadButton_B) || touch_back)) {
-        move_pending_ = false; move_source_ = {}; move_source_root_.clear();
-        status_ = "已取消移动";
+        if (local_sel_ < local_entries_.size())
+            local_selected_by_dir_[local_dir_] = local_entries_[local_sel_].path;
+        const std::string parent = local_parent_within(local_root_, local_dir_);
+        if (parent == local_dir_) {
+            status_ = "已到存储根目录；按 Y 打开操作菜单可取消移动";
+            return;
+        }
+        local_dir_ = parent;
+        local_sel_ = 0;
+        refresh_local();
+        status_ = "移动模式：按 B 返回上级；按 Y 打开操作菜单可取消移动";
         return;
     }
     if (!move_pending_ && ((down & HidNpadButton_B) || touch_back)) {
-        local_dir_ = local_parent_within(local_root_, local_dir_);
-        refresh_local();
+        if (local_sel_ < local_entries_.size())
+            local_selected_by_dir_[local_dir_] = local_entries_[local_sel_].path;
+        const std::string parent = local_parent_within(local_root_, local_dir_);
+        if (parent == local_dir_) {
+            status_ = "已在当前存储根目录";
+            return;
+        }
+        local_dir_ = parent;
         local_sel_ = 0;
+        refresh_local();
         return;
     }
 
@@ -566,13 +595,14 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
     if (local_sel_ >= local_entries_.size()) return;
     const auto entry = local_entries_[local_sel_];
     if (entry.is_dir) {
+        local_selected_by_dir_[local_dir_] = entry.path;
         local_dir_ = entry.path;
-        refresh_local();
         local_sel_ = 0;
+        refresh_local();
         return;
     }
     if (move_pending_) {
-        status_ = "移动模式：A 打开文件夹；Y → 移动到当前目录；B 取消";
+        status_ = "移动模式：A 打开文件夹；B 返回上级；Y 打开操作菜单";
         return;
     }
 
@@ -611,7 +641,10 @@ void Runtime::handle_local(const InputFrame& frame, ActionContext& ctx) {
             move_source_ = entry;
             move_source_root_ = local_root_;
             move_pending_ = true;
-            status_ = "移动模式：浏览到目标目录后按 Y → 移动到当前目录；B 取消";
+            local_selected_by_dir_[local_dir_] = entry.path;
+            config_.local_focus_path = entry.path;
+            persist_local_state();
+            status_ = "移动模式：浏览到目标目录后按 Y 移动；按 B 返回上级，Y 菜单可取消";
             break;
         case LocalFileAction::Delete: delete_current(); break;
     }

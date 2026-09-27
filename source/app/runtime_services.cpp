@@ -17,6 +17,7 @@
 #include <curl/curl.h>
 #include <algorithm>
 #include <cstdio>
+#include <iterator>
 #include <map>
 #include <string>
 #include <vector>
@@ -161,6 +162,60 @@ bool Runtime::refresh_local() {
         }
     } else {
         local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(), [](const auto& entry) { return is_transfer_sidecar_name(entry.name); }), local_entries_.end());
+        const auto remembered = local_selected_by_dir_.find(local_dir_);
+        std::string restore_path;
+        bool restore_from_config = false;
+        if (remembered != local_selected_by_dir_.end()) {
+            restore_path = remembered->second;
+        } else if (!config_.local_focus_path.empty() &&
+                   local_path_is_within(local_root_, config_.local_focus_path) &&
+                   config_.local_focus_path != local_dir_) {
+            std::string candidate = config_.local_focus_path;
+            std::string parent = local_parent_directory(candidate);
+            while (!parent.empty() && parent != local_dir_ && parent != candidate &&
+                   local_path_is_within(local_root_, parent)) {
+                candidate = parent;
+                parent = local_parent_directory(candidate);
+            }
+            if (parent == local_dir_) {
+                restore_path = candidate;
+                restore_from_config = true;
+            }
+        }
+        if (!restore_path.empty()) {
+            const std::string path = restore_path;
+            auto found = std::find_if(local_entries_.begin(), local_entries_.end(),
+                [&](const LocalEntry& entry) { return entry.path == path; });
+            if (found == local_entries_.end() && (!restore_from_config || path == config_.local_focus_path) &&
+                local_parent_directory(path) == local_dir_ &&
+                local_path_is_within(local_root_, path) &&
+                !is_transfer_sidecar_name(basename_of(path)) &&
+                local_path_exists(path)) {
+                LocalEntry fallback{};
+                fallback.name = basename_of(path);
+                fallback.path = path;
+                fallback.size = local_file_size(path);
+                fallback.is_dir = false;
+                local_entries_.push_back(std::move(fallback));
+                found = std::prev(local_entries_.end());
+                append_debug_log("本机目录恢复选中项时以 stat 回读补项",
+                    "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                    "\n" + local_path_diagnostic(path));
+            }
+            if (found != local_entries_.end()) {
+                local_sel_ = static_cast<std::size_t>(std::distance(local_entries_.begin(), found));
+            } else {
+                append_debug_log(restore_from_config ? "本机目录保存的文件定位路径回读失败" : "本机目录上次选中项回读失败",
+                    "local_root=" + local_root_ + "\nlocal_dir=" + local_dir_ +
+                    "\n" + local_path_diagnostic(path));
+                if (!restore_from_config) local_selected_by_dir_.erase(remembered);
+                else if (path == config_.local_focus_path) config_.local_focus_path.clear();
+            }
+        } else if (local_entries_.empty()) {
+            local_sel_ = 0;
+        } else if (local_sel_ >= local_entries_.size()) {
+            local_sel_ = local_entries_.size() - 1;
+        }
     }
     local_selection_.erase(std::remove_if(local_selection_.begin(), local_selection_.end(), [](const std::string& path) { return !local_path_exists(path); }), local_selection_.end());
     persist_local_state();

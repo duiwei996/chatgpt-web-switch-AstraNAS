@@ -299,6 +299,7 @@ bool load_config(const std::string& path, AppConfig& out, std::string& error) {
         else if (key == "manifest") out.manifest = value;
         else if (key == "local_dir") out.local_dir = value;
         else if (key == "local_root") out.local_root = value;
+        else if (key == "local_focus_path") out.local_focus_path = value;
         else if (key == "cache_dir") out.cache_dir = value;
         else if (key == "download_retries") out.download_retries = parse_int(value, out.download_retries, 0, 5);
         else if (key == "network_direct_install") out.network_direct_install = parse_bool(value, out.network_direct_install);
@@ -370,6 +371,7 @@ bool save_config(const std::string& path, const AppConfig& input, std::string& e
         << "manifest=" << config.manifest << "\n"
         << "local_dir=" << config.local_dir << "\n"
         << "local_root=" << config.local_root << "\n"
+        << "local_focus_path=" << config.local_focus_path << "\n"
         << "cache_dir=" << config.cache_dir << "\n"
         << "download_retries=" << config.download_retries << "\n"
         << "network_direct_install=" << (config.network_direct_install ? "true" : "false") << "\n"

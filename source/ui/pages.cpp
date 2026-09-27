@@ -179,9 +179,9 @@ void draw_local(Gui& gui,const std::vector<LocalEntry>& entries,std::size_t sele
     std::vector<std::string> labels; labels.reserve(selection.size());
     for(const auto& path:selection) labels.push_back(astranas::app::basename_of(path));
     queue_preview(gui,labels,910,302,300);
-    gui.paragraph(910,445,15,palette::muted,"X 直接勾选/取消；Y 打开批量、全选/反选、切换存储等页面操作。移动模式进入后，状态栏会提示 Y → 移动到当前目录。",300,23,6);
+    gui.paragraph(910,445,15,palette::muted,"X 直接勾选/取消；Y 打开批量、全选/反选、切换存储等页面操作。移动模式中 B 返回上级，Y 菜单可取消移动。",300,23,6);
     gui.button_hint(48,654,"A","打开 / 文件操作");
-    gui.button_hint(300,654,"B","返回 / 取消移动",palette::danger);
+    gui.button_hint(300,654,"B","返回上级",palette::danger);
     gui.button_hint(500,654,"X","勾选 / 取消",palette::success);
     gui.button_hint(742,654,"Y","页面操作",palette::accent);
     gui.end();
