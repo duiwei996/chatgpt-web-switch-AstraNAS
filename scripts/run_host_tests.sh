@@ -122,7 +122,7 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'e00a1ca673ed4adffd4a04474c21a48a16fe6d45'" .github/workflows/build-nro.yml
+grep -q "github.event.before == 'b7bdc041208a2477132532a332c052d04b0cf7b0'" .github/workflows/build-nro.yml
 ! grep -q '3ed7ff41030db1b1ea9054fb6fcbdee446ed5563' .github/workflows/build-nro.yml
 ! grep -q '9eeda814367ba0b6989b261420c897a4deb73ccc' .github/workflows/build-nro.yml
 ! grep -q 'c5fd847f6ff3902dbc14b67960575dcf863ed587' .github/workflows/build-nro.yml
