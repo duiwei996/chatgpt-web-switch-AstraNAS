@@ -1,8 +1,17 @@
-# AstraNAS v1.1.3
+# AstraNAS v1.1.4
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
-主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+主程序支持通过 hbmenu Applet 模式或完整应用模式运行；大型安装建议使用完整应用模式以留出更多内存。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.1.4 网络安装、本机下载与 DLC 管理修复
+
+- 网络直装和本机下载预读环从 1 GiB / 128 MiB 降至 8 MiB 双缓冲，避免大额连续内存分配；安装程序不再因 Applet 模式直接拒绝启动。
+- NAS 文件操作显示本机保存目录和文件名；下载后校验最终文件、刷新并切换到本机目录定位文件。
+- 新增“下载到本机后安装”，先完成下载与文件大小回读，再从最终本机路径安装。
+- 修正 SD/USB 挂载根目录的父路径处理，保证内部断点状态目录可在 `sdmc:/`、`usb:/` 等路径正确创建。
+- DLC/部分卸载不再依赖可能失败的 NS 应用记录列表；使用系统内容状态与 NCM 数据库索引核对，记录不匹配时停止操作以保护已安装内容。
+- CNMT mount 失败日志新增源 NCA 与注册 NCA 主体 SHA-256 比对，排查时避开 NCA header 规范化带来的散列差异。
 
 ## v1.1.3 原始文件名直写与传输状态隔离
 
@@ -202,7 +211,7 @@ SMB/WebDAV direct read
         ↓
 连续流 / 有序流水线
         ↓
-16 × 8 MiB RAM ring（128 MiB）
+2 × 4 MiB RAM ring（8 MiB）
         ↓
 4 MiB 文件写片段
         ↓
@@ -211,10 +220,12 @@ SMB/WebDAV direct read
 
 保留 `.astranas-part`、`.astranas-meta`、断点续传、远端 identity 校验、失败重试、可选 SHA-256 和最终原子发布。进度页同时显示网络纯读、本机写入、等待落盘与 RAM 占用。
 
-网络直装继续使用深度更大的：
+NAS 文件操作会显示本机保存目录和文件名。下载完成后自动切到本机文件页并定位文件；安装包还可以选择“下载到本机后安装”，该操作会从发布后的本机文件重新打开安装源。
+
+网络直装和本机安装使用相同的 8 MiB 预读容量，并保留双缓冲读写重叠：
 
 ```text
-SMB/WebDAV -> 128 × 8 MiB（1 GiB）read-ahead -> 安装核心 -> NCM
+SMB/WebDAV -> 2 × 4 MiB（8 MiB）read-ahead -> 安装核心 -> NCM
 ```
 
 ## 网络诊断

@@ -58,8 +58,9 @@ bool stream_buffered_read_ahead(PackageSource& source,
         slots.resize(slot_count);
         for (auto& slot : slots) slot.data.resize(chunk_size);
     } catch (const std::bad_alloc&) {
-        if (slot_count == kInstallReadAheadSlots && chunk_size == kInstallStreamChunkSize)
-            error = "无法分配 1 GiB 网络直装预读缓冲；请确认从完整应用模式启动 AstraNAS";
+        if (record_install_metrics && slot_count == kInstallReadAheadSlots &&
+            chunk_size == kInstallStreamChunkSize)
+            error = "无法分配 8 MiB 安装预读缓冲；请确认从完整应用模式启动 AstraNAS";
         else
             error = "无法分配高速传输预读缓冲";
         return false;

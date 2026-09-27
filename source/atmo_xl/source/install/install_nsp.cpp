@@ -25,6 +25,7 @@ SOFTWARE.
 #include <algorithm>
 #include <cctype>
 #include <machine/endian.h>
+#include <cstring>
 #include <limits>
 #include <exception>
 
@@ -50,6 +51,15 @@ namespace {
                std::tolower(static_cast<unsigned char>(name[offset + 1])) == 'n' &&
                std::tolower(static_cast<unsigned char>(name[offset + 2])) == 'c' &&
                std::tolower(static_cast<unsigned char>(name[offset + 3])) == 'z';
+    }
+
+    std::string audit_field(const std::string& audit, const char* field)
+    {
+        const std::size_t key = audit.find(field);
+        if (key == std::string::npos) return {};
+        const std::size_t begin = key + std::strlen(field);
+        const std::size_t end = audit.find_first_of(" \r\n]", begin);
+        return audit.substr(begin, end == std::string::npos ? end : end - begin);
     }
 }
 
@@ -87,8 +97,42 @@ namespace tin::install::nsp
 
             // Prepare needs a mounted CNMT. Reuse a healthy registered CNMT, but
             // automatically replace stale/corrupt content from the verified package
-            // before retrying the mount.
-            CNMTList.push_back( { this->InstallAndReadCnmtWithRepair(cnmtContentInfo), cnmtContentInfo } );
+            // before retrying the mount. If mounting fails, include both the source
+            // entry's full SHA-256 and the registered NCA audit so transport/write
+            // differences cannot be mistaken for a bad package.
+            try {
+                CNMTList.push_back({this->InstallAndReadCnmtWithRepair(cnmtContentInfo),
+                                    cnmtContentInfo});
+            } catch (const std::exception& installError) {
+                std::string sourceAudit;
+                std::string sourceSha256;
+                std::string sourceBodySha256;
+                try {
+                    const auto audit = m_NSP->AuditFileEntry(
+                        fileEntry, cnmtContentId, !compressedCnmt);
+                    sourceAudit = audit.details;
+                    sourceSha256 = audit.entrySha256;
+                    sourceBodySha256 = audit.entryBodySha256;
+                } catch (const std::exception& auditError) {
+                    sourceAudit = std::string("audit_failed=") + auditError.what();
+                }
+
+                const std::string registeredSha256 =
+                    audit_field(installError.what(), "registered_sha256=");
+                const std::string registeredBodySha256 =
+                    audit_field(installError.what(), "registered_body_sha256=");
+                const char* comparison = "unavailable";
+                if (compressedCnmt) comparison = "not_applicable_compressed";
+                else if (!sourceBodySha256.empty() && !registeredBodySha256.empty())
+                    comparison = sourceBodySha256 == registeredBodySha256 ? "match" : "different";
+
+                THROW_FORMAT("NSP CNMT install/mount failed [entry=%s entry_size=0x%lx content_id=%s source_vs_registered_body_sha256=%s source_full_sha256=%s registered_full_sha256=%s]; cause=[%s]; source_audit=[%s]",
+                             cnmtNcaName.c_str(), static_cast<u64>(fileEntry->fileSize),
+                             tin::util::GetNcaIdString(cnmtContentId).c_str(), comparison,
+                             sourceSha256.empty() ? "unavailable" : sourceSha256.c_str(),
+                             registeredSha256.empty() ? "unavailable" : registeredSha256.c_str(),
+                             installError.what(), sourceAudit.c_str());
+            }
         }
 
         return CNMTList;

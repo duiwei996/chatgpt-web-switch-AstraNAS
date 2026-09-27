@@ -339,19 +339,27 @@ InstallResult install_remote_entry(RemoteClient& remote, const RemoteDirEntry& e
         }, options);
     const auto perf = log_install_performance(perf_started);
     const std::string perf_text = astranas::install_performance::compact_summary(perf);
+    std::string finish_error;
+    const bool source_consistent = result == InstallResult::Cancelled || ctx.exit_requested
+        ? true : source.finish(finish_error);
+    if (!source_consistent) {
+        append_debug_log("网络直装源文件最终一致性检查",
+                         "path=" + entry.path + "\n" + finish_error);
+        if (!error.empty()) error += "; ";
+        error += "NAS 文件收尾一致性检查失败: " + finish_error;
+    }
 
     if (result == InstallResult::Success) {
-        std::string finish_error;
-        if (!source.finish(finish_error))
-            append_debug_log("网络直装源文件最终一致性检查", finish_error);
         status = "网络直装成功，NAS 源文件已保留" +
                  (perf_text.empty() ? std::string{} : " · " + perf_text);
+        if (!source_consistent) status += "；NAS 文件收尾检查失败，详情已写入日志";
         if (!error.empty()) append_debug_log("安装警告", error);
         if (notify_on_success) astranas::completion_sound::play_success();
         return result;
     }
     if (result == InstallResult::Skipped) {
         status = "已跳过相同版本或降级安装包，NAS 源文件已保留";
+        if (!source_consistent) status += "；NAS 文件收尾检查失败，详情已写入日志";
         return result;
     }
     if (result == InstallResult::Unsupported) status = friendly_error("网络直装后端不可用", error);

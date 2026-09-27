@@ -329,7 +329,7 @@ void CurlRemoteClient::apply_common(void* curl_handle) const {
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 120L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     // Ask libcurl for a substantially larger receive buffer on Switch. This is a
-    // transport buffer request, not the 1 GiB install ring; callback granularity is
+    // transport buffer request, not the 8 MiB install ring; callback granularity is
     // measured separately by NetDiag because libcurl may still deliver smaller chunks.
     curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 1024L * 1024L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "AstraNAS/1.1.9");

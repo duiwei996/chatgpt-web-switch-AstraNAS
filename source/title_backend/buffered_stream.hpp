@@ -10,9 +10,9 @@
 
 namespace astranas::title_backend {
 
-inline constexpr std::size_t kInstallStreamChunkSize = 8u * 1024u * 1024u;
-inline constexpr std::size_t kInstallReadAheadSlots = 128u;
-inline constexpr std::size_t kDownloadReadAheadSlots = 16u; // 128 MiB download ring.
+inline constexpr std::size_t kInstallStreamChunkSize = 4u * 1024u * 1024u;
+inline constexpr std::size_t kInstallReadAheadSlots = 2u; // 8 MiB install ring.
+inline constexpr std::size_t kDownloadReadAheadSlots = 2u; // 8 MiB download ring.
 inline constexpr std::size_t kInstallWriteSliceSize = 1u * 1024u * 1024u;
 inline constexpr std::size_t kDownloadWriteSliceSize = 4u * 1024u * 1024u;
 

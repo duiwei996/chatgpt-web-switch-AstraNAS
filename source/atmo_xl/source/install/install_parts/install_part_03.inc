@@ -51,18 +51,29 @@
         const auto decoded = tin::install::DecodeNcaHeaderBytes(rawHeader.data(), rawHeader.size());
 
         AstraSha256Context hash;
+        AstraSha256Context bodyHash;
         std::vector<u8> buffer(256u * 1024u);
         u64 offset = 0;
+        const u64 bodyOffset = std::min<u64>(size, sizeof(tin::install::NcaHeader));
         while (offset < size)
         {
             const size_t want = static_cast<size_t>(
                 std::min<u64>(buffer.size(), size - offset));
             storage.Read(contentId, offset, buffer.data(), want);
             hash.update(buffer.data(), want);
+            const u64 chunkEnd = offset + want;
+            if (chunkEnd > bodyOffset)
+            {
+                const u64 bodyBegin = std::max(offset, bodyOffset);
+                const size_t bodyBeginInChunk = static_cast<size_t>(bodyBegin - offset);
+                bodyHash.update(buffer.data() + bodyBeginInChunk,
+                                static_cast<size_t>(chunkEnd - bodyBegin));
+            }
             offset += want;
         }
 
         const std::string digest = sha256_digest_hex(hash.final());
+        const std::string bodyDigest = sha256_digest_hex(bodyHash.final());
         const std::string expected = tin::util::GetNcaIdString(contentId);
         const bool idMatch = digest.size() >= expected.size() &&
                              digest.compare(0, expected.size(), expected) == 0;
@@ -70,6 +81,7 @@
         std::ostringstream out;
         out << "registered_size=0x" << std::hex << size
             << " registered_sha256=" << digest
+            << " registered_body_sha256=" << bodyDigest
             << " content_id_match=" << (idMatch ? "yes" : "no")
             << " header_mode=" << tin::install::NcaHeaderModeLabel(decoded.mode)
             << " raw_magic=0x" << decoded.rawMagic
@@ -166,12 +178,12 @@
             {
                 registeredAudit = std::string("audit_failed=") + auditError.what();
             }
-            const bool verifiedRegisteredBytes =
+            const bool registeredContentIdMatches =
                 registeredAudit.find("content_id_match=yes") != std::string::npos;
             const bool hierarchicalHashFailure =
                 mountFailure.find("0x001fd602") != std::string::npos;
-            if (verifiedRegisteredBytes && hierarchicalHashFailure)
-                THROW_FORMAT("Verified CNMT bytes match the Content ID before/after registration, but Horizon rejected the NCA internal hierarchical SHA-256 (0x001fd602 / 2002-4075). The package CNMT filesystem hash tree is inconsistent; reacquire or rebuild the package. mount=[%s]; registered_audit=[%s]",
+            if (registeredContentIdMatches && hierarchicalHashFailure)
+                THROW_FORMAT("Horizon rejected the registered CNMT NCA filesystem hierarchical SHA-256 (0x001fd602 / 2002-4075). The registered Content ID prefix matches; compare source_audit.entry_body_sha256 with registered_audit.registered_body_sha256 to check copied NCA payload bytes without the canonicalized header. mount=[%s]; registered_audit=[%s]",
                              mountFailure.c_str(), registeredAudit.c_str());
             if (existedBefore)
                 THROW_FORMAT("Existing CNMT was replaced with verified package content but mount still failed; before=%s; after=%s; registered_audit=[%s]",

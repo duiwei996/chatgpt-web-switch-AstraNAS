@@ -39,17 +39,6 @@ using namespace runtime_detail;
 int Runtime::execute() {
     initialize_input();
     if (!initialize_gui()) return 1;
-    if (appletGetAppletType() == AppletType_LibraryApplet) {
-        astranas::ui::show_message_wait(
-            gui_, pad_, exit_requested_,
-            "Applet 模式不允许运行 AstraNAS",
-            "网络直装使用 1 GiB 环形预读缓冲，需要完整应用模式。\n\n"
-            "Atmosphere 默认配置：返回 HOME 并完全关闭当前软件；按住 R 不放启动任意已安装游戏；"
-            "如出现用户选择界面，继续按住 R 完成选择；保持 R 直到进入 hbmenu。确认 hbmenu 不再显示 Applet Mode 后，再启动 AstraNAS。",
-            "AstraNAS · 启动模式");
-        gui_.shutdown();
-        return 2;
-    }
     std::string wlan_error;
     if (!astranas::network::set_wireless_priority(true, wlan_error))
         append_debug_log("WLAN 优先模式", wlan_error);

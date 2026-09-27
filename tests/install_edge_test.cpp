@@ -141,7 +141,7 @@ int main() {
     const auto stats = astranas::install_performance::snapshot();
     assert(stats.source_bytes == total);
     assert(stats.source_backpressure_ns > 0);
-    assert(astranas::title_backend::kInstallReadAheadSlots == 128u);
+    assert(astranas::title_backend::kInstallReadAheadSlots == 2u);
     assert(astranas::title_backend::kInstallWriteSliceSize <
            astranas::title_backend::kInstallStreamChunkSize);
     assert(astranas::title_backend::kInstallStreamChunkSize %

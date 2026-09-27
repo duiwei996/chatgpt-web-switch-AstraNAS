@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <dirent.h>
+#include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -68,6 +69,17 @@ bool mkdir_one(const std::string& path) {
     return S_ISDIR(st.st_mode);
 }
 
+std::string bytes_as_hex(const std::string& value) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(value.size() * 2);
+    for (const unsigned char byte : value) {
+        out.push_back(digits[byte >> 4]);
+        out.push_back(digits[byte & 0x0f]);
+    }
+    return out;
+}
+
 bool remove_tree(const std::string& root, const std::string& path, std::string& error) {
     const std::string managedRoot = trim_trailing_slash(root);
     const auto slash = trim_trailing_slash(path).find_last_of('/');
@@ -116,7 +128,9 @@ bool local_mkdir_p(const std::string& path) {
     for (std::size_t i = 0; i < path.size(); ++i) {
         current.push_back(path[i]);
         if (path[i] != '/') continue;
-        if (current == "/" || current == "sdmc:/") continue;
+        const bool mounted_root = current.size() >= 2 && current.back() == '/' &&
+                                  current[current.size() - 2] == ':';
+        if (current == "/" || mounted_root) continue;
         if (!mkdir_one(current.substr(0, current.size() - 1))) return false;
     }
     return mkdir_one(path);
@@ -126,6 +140,65 @@ std::string local_join_path(const std::string& parent, const std::string& child)
     if (parent.empty()) return child;
     if (parent.back() == '/') return parent + child;
     return parent + "/" + child;
+}
+
+std::string local_parent_directory(const std::string& path) {
+    const auto mount_root = path.find(":/");
+    if (mount_root != std::string::npos && mount_root + 2 == path.size()) return path;
+
+    std::size_t end = path.size();
+    while (end > 1 && path[end - 1] == '/') --end;
+    const auto slash = path.rfind('/', end == 0 ? 0 : end - 1);
+    if (slash == std::string::npos) return {};
+    if (slash == 0) return "/";
+    if (path[slash - 1] == ':') return path.substr(0, slash + 1);
+    return path.substr(0, slash);
+}
+
+std::string local_path_diagnostic(const std::string& path) {
+    std::ostringstream out;
+    const std::string parent = local_parent_directory(path);
+    const auto slash = path.find_last_of('/');
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+
+    out << "destination=" << path << "\n"
+        << "destination_name_hex=" << bytes_as_hex(name) << "\n"
+        << "parent=" << (parent.empty() ? "." : parent) << "\n";
+
+    struct stat target_stat{};
+    errno = 0;
+    const int stat_result = stat(path.c_str(), &target_stat);
+    const int stat_error = errno;
+    out << "stat.destination=" << (stat_result == 0 ? "ok" : "failed")
+        << " errno=" << stat_error;
+    if (stat_result == 0) out << " size=" << target_stat.st_size;
+    else out << " error=" << std::strerror(stat_error);
+    out << "\n";
+
+    const std::string directory = parent.empty() ? "." : parent;
+    errno = 0;
+    DIR* dir = opendir(directory.c_str());
+    const int open_error = errno;
+    out << "opendir.parent=" << (dir ? "ok" : "failed")
+        << " errno=" << open_error;
+    if (!dir) out << " error=" << std::strerror(open_error);
+    out << "\n";
+    if (!dir) return out.str();
+
+    std::size_t count = 0;
+    bool exact_name_found = false;
+    errno = 0;
+    while (dirent* ent = readdir(dir)) {
+        const std::string entry_name = ent->d_name;
+        out << "readdir[" << count++ << "].d_name_hex=" << bytes_as_hex(entry_name) << "\n";
+        if (entry_name == name) exact_name_found = true;
+    }
+    const int read_error = errno;
+    closedir(dir);
+    out << "readdir.count=" << count << " errno=" << read_error;
+    if (read_error != 0) out << " error=" << std::strerror(read_error);
+    out << "\nreaddir.exact_name_match=" << (exact_name_found ? "yes" : "no") << "\n";
+    return out.str();
 }
 
 bool list_local_dir(const std::string& path, std::vector<LocalEntry>& entries, std::string& error) {
@@ -191,8 +264,7 @@ bool copy_local_file(const std::string& source, const std::string& destination, 
     std::FILE* in = std::fopen(source.c_str(), "rb");
     if (!in) { error = "cannot open source"; return false; }
 
-    const auto slash = destination.find_last_of('/');
-    const std::string parent = slash == std::string::npos ? std::string{} : destination.substr(0, slash);
+    const std::string parent = local_parent_directory(destination);
     const std::string state_dir = local_join_path(parent, ".astranas-transfer");
     if (!local_mkdir_p(state_dir)) { std::fclose(in); error = "cannot create internal transfer directory"; return false; }
     const std::string temporary = local_join_path(state_dir, "local-copy.part");

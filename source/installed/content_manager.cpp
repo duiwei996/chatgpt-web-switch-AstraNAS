@@ -8,8 +8,10 @@
 #include <cstring>
 #include <iomanip>
 #include <map>
+#include <new>
 #include <set>
 #include <sstream>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -17,6 +19,7 @@ namespace astranas::installed {
 namespace {
 
 constexpr s32 kMaxApplicationRecords = 4096;
+constexpr s32 kMaxDatabaseApplicationKeys = 65536;
 constexpr u64 kMaxMetaRecordSize = 16ULL * 1024ULL * 1024ULL;
 
 std::string result_text(const char* prefix, Result rc) {
@@ -34,9 +37,13 @@ bool same_record(const ContentStorageRecord& a, const ContentStorageRecord& b) {
     return same_key(a.metaRecord, b.metaRecord) && a.storageId == b.storageId;
 }
 
+using StatusKey = std::tuple<u8, u8, u32>; // content-meta type, storage ID, version
+using DatabaseKey = std::pair<u8, u8>;    // storage ID, content-meta type
+
 bool list_records(u64 application_id, std::vector<ContentStorageRecord>& records,
                   std::string& error) {
     records.clear();
+    error.clear();
     s32 count = 0;
     Result rc = nsCountApplicationContentMeta(application_id, &count);
     if (R_FAILED(rc)) { error = result_text("无法读取应用内容数量", rc); return false; }
@@ -44,13 +51,147 @@ bool list_records(u64 application_id, std::vector<ContentStorageRecord>& records
         error = count <= 0 ? "该应用没有可管理的已安装内容" : "应用内容记录数量异常";
         return false;
     }
-    records.resize(static_cast<std::size_t>(count));
-    u32 written = 0;
-    rc = nsListApplicationRecordContentMeta(
-        0, application_id, records.data(), static_cast<u32>(records.size()), &written);
-    if (R_FAILED(rc)) { error = result_text("无法读取应用内容记录", rc); return false; }
-    if (written != static_cast<u32>(records.size())) {
+
+    // NS's application-record list can fail even when the title's metadata is
+    // available. Read the status list, then resolve those exact entries back to
+    // NCM keys. Never rebuild the application record from unverified DB rows.
+    std::vector<NsApplicationContentMetaStatus> statuses(static_cast<std::size_t>(count));
+    s32 status_written = 0;
+    rc = nsListApplicationContentMetaStatus(
+        application_id, 0, statuses.data(), count, &status_written);
+    if (R_FAILED(rc)) { error = result_text("无法读取应用内容状态", rc); return false; }
+    if (status_written != count) {
         error = "应用内容记录在读取过程中发生变化";
+        return false;
+    }
+
+    std::map<StatusKey, s32> expected;
+    std::map<StatusKey, std::vector<NcmContentMetaKey>> candidates_by_status;
+    std::set<DatabaseKey> databases;
+    for (const auto& status : statuses) {
+        if (status.application_id != application_id) {
+            error = "系统返回了其他应用的内容状态，已停止 DLC 管理";
+            return false;
+        }
+        if (status.storageID == NcmStorageId_None ||
+            status.storageID >= NcmStorageId_Any) {
+            error = "应用内容状态包含无效存储位置";
+            return false;
+        }
+        if (status.meta_type < NcmContentMetaType_Application ||
+            status.meta_type > NcmContentMetaType_DataPatch) {
+            error = "应用内容状态包含暂不支持的内容类型";
+            return false;
+        }
+        const StatusKey status_key{status.meta_type, status.storageID, status.version};
+        ++expected[status_key];
+        databases.emplace(status.storageID, status.meta_type);
+    }
+
+    for (const auto& request : databases) {
+        const u8 storage_id = request.first;
+        const u8 meta_type = request.second;
+        NcmContentMetaDatabase db{};
+        rc = ncmOpenContentMetaDatabase(&db, static_cast<NcmStorageId>(storage_id));
+        if (R_FAILED(rc)) {
+            error = result_text("无法打开应用内容元数据库", rc);
+            records.clear();
+            return false;
+        }
+
+        NcmApplicationContentMetaKey first{};
+        s32 total = 0;
+        s32 written = 0;
+        rc = ncmContentMetaDatabaseListApplication(
+            &db, &total, &written, &first, 1,
+            static_cast<NcmContentMetaType>(meta_type));
+        if (R_FAILED(rc)) {
+            ncmContentMetaDatabaseClose(&db);
+            error = result_text("无法读取应用内容元数据库索引", rc);
+            records.clear();
+            return false;
+        }
+        if (total < 0 || total > kMaxDatabaseApplicationKeys ||
+            written < 0 || written > 1 || written > total) {
+            ncmContentMetaDatabaseClose(&db);
+            error = "应用内容元数据库索引数量异常";
+            records.clear();
+            return false;
+        }
+
+        std::vector<NcmApplicationContentMetaKey> keys;
+        try {
+            keys.resize(static_cast<std::size_t>(total));
+        } catch (const std::bad_alloc&) {
+            ncmContentMetaDatabaseClose(&db);
+            error = "应用内容元数据库索引占用内存过大";
+            records.clear();
+            return false;
+        }
+        s32 listed_total = 0;
+        s32 listed = 0;
+        if (total > 0) {
+            rc = ncmContentMetaDatabaseListApplication(
+                &db, &listed_total, &listed, keys.data(), total,
+                static_cast<NcmContentMetaType>(meta_type));
+        }
+        ncmContentMetaDatabaseClose(&db);
+        if (total > 0 && R_FAILED(rc)) {
+            error = result_text("无法读取应用内容元数据库索引", rc);
+            records.clear();
+            return false;
+        }
+        if (listed_total != total || listed != total) {
+            error = "应用内容元数据库在读取过程中发生变化";
+            records.clear();
+            return false;
+        }
+
+        for (const auto& application_key : keys) {
+            if (application_key.application_id != application_id) continue;
+            const auto& key = application_key.key;
+            if (key.type != meta_type) {
+                error = "应用内容元数据库返回了不匹配的内容类型";
+                records.clear();
+                return false;
+            }
+            const StatusKey status_key{key.type, storage_id, key.version};
+            candidates_by_status[status_key].push_back(key);
+        }
+    }
+
+    for (const auto& item : expected) {
+        const auto found = candidates_by_status.find(item.first);
+        if (item.second <= 0 || found == candidates_by_status.end() ||
+            found->second.size() != static_cast<std::size_t>(item.second)) {
+            records.clear();
+            error = "应用内容状态与元数据库记录不一致，已停止管理以保护已安装内容";
+            return false;
+        }
+    }
+
+    records.reserve(statuses.size());
+    for (const auto& status : statuses) {
+        const StatusKey status_key{status.meta_type, status.storageID, status.version};
+        auto found = candidates_by_status.find(status_key);
+        if (found == candidates_by_status.end() || found->second.empty()) {
+            records.clear();
+            error = "无法将系统内容状态对应到已安装元数据";
+            return false;
+        }
+        ContentStorageRecord record{};
+        record.metaRecord = found->second.back();
+        record.storageId = status.storageID;
+        found->second.pop_back();
+        records.push_back(record);
+    }
+
+    if (records.size() != static_cast<std::size_t>(count) ||
+        std::any_of(candidates_by_status.begin(), candidates_by_status.end(), [](const auto& item) {
+            return !item.second.empty();
+        })) {
+        records.clear();
+        error = "应用内容状态与元数据库记录不一致，已停止管理以保护已安装内容";
         return false;
     }
     return true;

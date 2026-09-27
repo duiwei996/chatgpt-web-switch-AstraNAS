@@ -50,7 +50,13 @@ std::string friendly_error(const std::string& action, const std::string& raw) {
                               lower.find("webdav") != std::string::npos ||
                               lower.find("curl") != std::string::npos ||
                               lower.find("response") != std::string::npos;
-    if (lower.find("cancel") != std::string::npos) reason = "操作已取消";
+    if (lower.find("hierarchical sha-256") != std::string::npos ||
+        lower.find("0x001fd602") != std::string::npos ||
+        lower.find("2002-4075") != std::string::npos)
+        reason = "系统拒绝打开 NCA 文件系统（层级 SHA-256 校验失败）；请查看源包与注册后 NCA 的 SHA-256 审计";
+    else if (lower.find("安装预读缓冲") != std::string::npos)
+        reason = "安装预读缓冲内存不足，请关闭其他程序后重试";
+    else if (lower.find("cancel") != std::string::npos) reason = "操作已取消";
     else if (lower.find("timeout") != std::string::npos || lower.find("timed out") != std::string::npos) reason = "连接超时，请检查网络和服务器状态";
     else if ((http_context && (lower.find("401") != std::string::npos || lower.find("403") != std::string::npos)) ||
              lower.find("auth") != std::string::npos || lower.find("password") != std::string::npos ||

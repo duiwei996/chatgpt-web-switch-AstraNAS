@@ -53,14 +53,6 @@ std::string lower_path(std::string value) {
     return value;
 }
 
-std::string local_parent_path(const std::string& path) {
-    const auto slash = path.find_last_of('/');
-    if (slash == std::string::npos) return {};
-    if (slash == 0) return "/";
-    if (slash + 1 == path.size()) return path.substr(0, slash);
-    return path.substr(0, slash);
-}
-
 struct TransferStatePaths {
     std::string directory;
     std::string partial;
@@ -69,7 +61,7 @@ struct TransferStatePaths {
 
 TransferStatePaths transfer_state_paths(const std::string& destination,
                                         const std::string& object_key) {
-    const std::string parent = local_parent_path(destination);
+    const std::string parent = local_parent_directory(destination);
     TransferStatePaths paths;
     paths.directory = local_join_path(parent, ".astranas-transfer");
     paths.partial = local_join_path(paths.directory, object_key + ".part");
@@ -220,9 +212,12 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
         status = "已阻止写入当前存储设备之外的位置";
         return false;
     }
-    const auto slash = destination.find_last_of('/');
-    if (slash != std::string::npos && !local_mkdir_p(destination.substr(0, slash))) {
+    const std::string destination_parent = local_parent_directory(destination);
+    if (!destination_parent.empty() && !local_mkdir_p(destination_parent)) {
         status = "无法创建目标目录";
+        append_debug_log("创建下载目标目录失败", "local_root=" + config.local_root +
+                         "\nlocal_dir=" + config.local_dir + "\ndestination=" + destination +
+                         "\nparent=" + destination_parent + "\nerrno=" + std::strerror(errno));
         return false;
     }
 
@@ -315,6 +310,7 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
                 status = friendly_error("无法覆盖本机同名文件 " + basename_of(destination), std::strerror(errno));
                 return false;
             }
+            append_debug_log("下载文件发布路径", "temporary=" + partial + "\ndestination=" + destination);
             if (std::rename(partial.c_str(), destination.c_str()) != 0) {
                 const int publish_errno = errno;
                 if (publish_errno == ENAMETOOLONG) {

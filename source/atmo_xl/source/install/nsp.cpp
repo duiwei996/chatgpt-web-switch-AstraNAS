@@ -31,6 +31,7 @@ SOFTWARE.
 #include <sstream>
 #include <utility>
 #include "data/buffered_placeholder_writer.hpp"
+#include "install/nca.hpp"
 #include "sha256.hpp"
 #include "util/title_util.hpp"
 #include "util/error.hpp"
@@ -233,22 +234,34 @@ namespace tin::install::nsp
         }
 
         std::string entryHash = "skipped_out_of_bounds";
+        std::string entryBodyHash = "skipped_out_of_bounds";
         tin::install::SourceContentIdStatus contentIdStatus =
             compareContentId
                 ? tin::install::SourceContentIdStatus::Unavailable
                 : tin::install::SourceContentIdStatus::NotApplicable;
         if (targetBoundsOk) {
             AstraSha256Context sha;
+            AstraSha256Context bodySha;
             std::array<u8, 64 * 1024> buffer{};
             u64 position = 0;
+            const u64 bodyOffset = std::min<u64>(fileEntry->fileSize,
+                                                  sizeof(tin::install::NcaHeader));
             while (position < fileEntry->fileSize) {
                 const size_t chunk = static_cast<size_t>(
                     std::min<u64>(buffer.size(), fileEntry->fileSize - position));
                 BufferData(buffer.data(), static_cast<off_t>(absoluteOffset + position), chunk);
                 sha.update(buffer.data(), chunk);
+                const u64 chunkEnd = position + chunk;
+                if (chunkEnd > bodyOffset) {
+                    const u64 bodyBegin = std::max(position, bodyOffset);
+                    const size_t bodyBeginInChunk = static_cast<size_t>(bodyBegin - position);
+                    bodySha.update(buffer.data() + bodyBeginInChunk,
+                                   static_cast<size_t>(chunkEnd - bodyBegin));
+                }
                 position += chunk;
             }
             entryHash = sha256_digest_hex(sha.final());
+            entryBodyHash = sha256_digest_hex(bodySha.final());
             if (compareContentId) {
                 const std::string expected = tin::util::GetNcaIdString(expectedContentId);
                 contentIdStatus =
@@ -269,6 +282,7 @@ namespace tin::install::nsp
             << " table_bounds=" << (tableBoundsOk ? "pass" : "fail")
             << " table_overlap=" << (tableOverlap ? "yes" : "no")
             << " entry_sha256=" << entryHash
+            << " entry_body_sha256=" << entryBodyHash
             << " expected_content_id=" << expectedId
             << " container=PFS0"
             << " files=" << GetBaseHeader()->numFiles
@@ -285,6 +299,7 @@ namespace tin::install::nsp
         result.tableBoundsOk = tableBoundsOk;
         result.tableOverlap = tableOverlap;
         result.entrySha256 = entryHash;
+        result.entryBodySha256 = entryBodyHash;
         result.expectedContentId = expectedId;
         result.details = out.str();
         return result;

@@ -32,6 +32,7 @@ namespace tin::install
         bool tableBoundsOk = false;
         bool tableOverlap = false;
         std::string entrySha256;
+        std::string entryBodySha256;
         std::string expectedContentId;
         std::string details;
 
