@@ -63,13 +63,13 @@ grep -q '服务器未提供强 ETag' source/remote/curl_client.cpp source/remote
 grep -q '服务器忽略 Range 请求' source/remote/curl_client.cpp source/remote/curl_stream.cpp
 grep -q 'padGetButtons(&ctx.pad)' source/app/action_install.cpp
 grep -q 'padGetButtons(&ctx.pad)' source/app/action_transfer.cpp
-grep -q 'kInstallReadAheadSlots = 128u' source/title_backend/buffered_stream.hpp
+grep -q 'kInstallReadAheadSlots = 2u' source/title_backend/buffered_stream.hpp
 grep -q 'kInstallWriteSliceSize = 1u \* 1024u \* 1024u' source/title_backend/buffered_stream.hpp
 grep -q 'std::chrono::milliseconds(25)' source/title_backend/buffered_stream.cpp
-grep -q 'appletGetAppletType() == AppletType_LibraryApplet' source/app/runtime.cpp
-grep -q 'Applet 模式不允许运行 AstraNAS' source/app/runtime.cpp
-grep -q '1 GiB 环形预读缓冲' source/app/runtime.cpp
-grep -q '无法分配 1 GiB 网络直装预读缓冲' source/title_backend/buffered_stream.cpp
+! grep -q 'appletGetAppletType() == AppletType_LibraryApplet' source/app/runtime.cpp
+! grep -q 'Applet 模式不允许运行 AstraNAS' source/app/runtime.cpp
+grep -q 'kInstallStreamChunkSize = 4u \* 1024u \* 1024u' source/title_backend/buffered_stream.hpp
+grep -q '无法分配 8 MiB 安装预读缓冲' source/title_backend/buffered_stream.cpp
 grep -q 'smb2_pread_async' source/remote/smb_client.cpp
 grep -q 'stream_contiguous' source/title_backend/buffered_stream.cpp
 grep -q 'stream_buffered_read_ahead' source/title_backend/buffered_stream.cpp source/atmo_xl/source/install/sdmc_nsp.cpp source/atmo_xl/source/install/sdmc_xci.cpp
@@ -110,7 +110,7 @@ grep -q 'kMaxNczSections = 0xFFFFULL' source/atmo_xl/source/nx/nca_writer.cpp
 grep -q 'cryptoType != 3 && cryptoType != 4' source/atmo_xl/source/nx/nca_writer.cpp
 grep -q 'GetPreparedStorageInfo' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install.cpp source/title_backend/backend_provider.cpp
 grep -q 'move_local_entry' source/local_fs.hpp source/local_fs.cpp source/app/runtime_files.cpp
-grep -q 'kDownloadReadAheadSlots = 16u' source/title_backend/buffered_stream.hpp
+grep -q 'kDownloadReadAheadSlots = 2u' source/title_backend/buffered_stream.hpp
 grep -q 'active_read_ns' source/title_backend/buffered_stream.hpp source/title_backend/buffered_stream.cpp
 grep -q 'maybe_save_install_log' source/app/runtime.cpp source/app/runtime_internal.hpp
 ! grep -q 'maybe_upload_install_log' source/app/runtime.cpp source/app/runtime_internal.hpp
