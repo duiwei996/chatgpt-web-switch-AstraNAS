@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 #ifdef __SWITCH__
-#include <switch/runtime/devices/fs_dev.h>
+#include <switch.h>
 #endif
 
 namespace {

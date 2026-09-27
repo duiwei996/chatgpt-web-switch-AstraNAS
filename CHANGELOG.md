@@ -1,5 +1,9 @@
 # AstraNAS 更新记录
 
+## v1.1.9
+
+- 通过 libnx 的统一 `switch.h` 头文件引入文件系统 API，修复 devkitPro 构建时 `fsdevCommitDevice` 的 C/C++ 链接名不匹配。
+
 ## v1.1.8
 
 - 下载原子改名后提交 SD/USB 挂载设备，并在目录枚举暂时漏项时按已回读的文件路径将文件补入当前列表。
