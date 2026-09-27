@@ -31,9 +31,12 @@ SOFTWARE.
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <vector>
 
+#include "install/nca_header_probe.hpp"
 #include "nx/ncm.hpp"
+#include "sha256.hpp"
 #include "util/config.hpp"
 #include "util/error.hpp"
 #include "util/file_util.hpp"

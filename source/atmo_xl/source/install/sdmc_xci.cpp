@@ -1,7 +1,7 @@
 #include "install/sdmc_xci.hpp"
 #include "error.hpp"
 #include "debug.h"
-#include "nx/validation_nca_writer.hpp"
+#include "nx/nca_writer.h"
 #include "ui/instPage.hpp"
 #include "util/lang.hpp"
 #include "bridge/install_hooks.hpp"
@@ -42,9 +42,12 @@ namespace tin::install::xci
         LOG_DEBUG("Retrieving %s\n", ncaFileName.c_str());
         size_t ncaSize = fileEntry->fileSize;
 
-        std::unique_ptr<ValidationAwareNcaWriter> writer = placeholderId
-            ? std::make_unique<ValidationAwareNcaWriter>(ncaId, *placeholderId, contentStorage, expectedHash)
-            : std::make_unique<ValidationAwareNcaWriter>(ncaId, contentStorage, expectedHash);
+        // Keep one authoritative NCA writer state machine. The base writer now
+        // handles short NCAs, NCZ, replacement placeholders and strong hashes,
+        // so a second close/header state machine only risks diverging from AtmoXL.
+        std::unique_ptr<NcaWriter> writer = placeholderId
+            ? std::make_unique<NcaWriter>(ncaId, *placeholderId, contentStorage, expectedHash)
+            : std::make_unique<NcaWriter>(ncaId, contentStorage, expectedHash);
 
         u64 fileStart = GetDataOffset() + fileEntry->dataOffset;
 

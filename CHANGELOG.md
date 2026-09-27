@@ -1,5 +1,14 @@
 # AstraNAS 更新记录
 
+## v1.1.0
+
+- 已安装应用新增升级包、全部 DLC、单个 DLC 与全部游戏内容四种卸载粒度；部分卸载维护 ContentMeta DB、ApplicationRecord 和 orphan NCA 三层一致性，并带失败恢复。
+- DLC 管理支持滚动长列表；单 DLC 在可用时一并删除其关联 DataPatch。
+- NAS 下载使用原文件名，同名本机文件按用户要求直接覆盖；继续保留 UTF-8 中文校验、字符边界截断和断点 sidecar。
+- 对照 AtmoXL 上游收敛 NCA 流入口：NSP/XCI 直接使用唯一 NcaWriter，不再套重复 ValidationAware close 状态机。
+- CNMT mount 失败新增注册后 ContentStorage 全量回读审计，输出注册实体 SHA-256、Content-ID match 和 header 关键字段，不降低 NCA/FS 完整性校验。
+- 版本升级为 1.1.0，并为本次 main 功能提交设置一次性 GitHub-hosted 构建门禁。
+
 ## v1.0.8
 
 - 本机下载恢复 NAS 原文件名，不再默认追加 16 位对象哈希；远端 object key 继续仅保存在 `.astranas-meta`。

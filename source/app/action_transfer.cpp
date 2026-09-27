@@ -207,21 +207,14 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
     const std::string partial_meta_path = partial + ".astranas-meta";
     const std::string final_meta_path = destination + ".astranas-meta";
     if (local_path_exists(destination)) {
-        TransferMetadata completed_metadata;
-        bool reusable = !entry.identity.empty() && read_transfer_metadata(final_meta_path, completed_metadata) &&
-                        completed_metadata.object_key == object_key && (!entry.size || local_file_size(destination) == entry.size);
-        if (reusable && config.verify_sha256) {
-            reusable = is_valid_sha256_hex(completed_metadata.sha256);
-            if (reusable) {
-                std::string digest, hash_error;
-                reusable = sha256_file(destination, digest, hash_error) && digest == completed_metadata.sha256;
-                if (!hash_error.empty()) append_debug_log("检查已完成文件", hash_error);
-            }
+        // User requested original-name semantics: an explicit download of the same
+        // NAS filename replaces the visible local file instead of inventing a hash name.
+        if (std::remove(destination.c_str()) != 0) {
+            status = friendly_error("无法覆盖本机同名文件 " + basename_of(destination), std::strerror(errno));
+            return false;
         }
-        if (reusable) { status = std::string(phase) + "已完成，可直接使用：" + basename_of(destination); return true; }
-        status = "本机当前目录已有同名文件，且无法确认来自同一个远端对象；为避免覆盖，请先重命名、移动或删除该文件：" +
-                 basename_of(destination);
-        return false;
+        std::remove(final_meta_path.c_str());
+        append_debug_log("覆盖本机同名文件", destination);
     }
 
     TransferMetadata partial_metadata;

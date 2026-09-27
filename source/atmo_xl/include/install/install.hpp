@@ -126,6 +126,7 @@ namespace tin::install
             void InstallNcaTracked(const NcmContentInfo& contentInfo);
             void ReinstallNcaTracked(const NcmContentInfo& contentInfo);
             nx::ncm::ContentMeta InstallAndReadCnmtWithRepair(NcmContentInfo& contentInfo);
+            std::string AuditRegisteredContent(const NcmContentId& contentId);
             const u8* FindExpectedContentHash(const NcmContentId& contentId) const;
             void RegisterRequiredRightsId(const u8 rightsId[16]);
             bool IsRequiredRightsId(const u8 rightsId[16]) const;

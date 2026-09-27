@@ -54,6 +54,7 @@ namespace nx::ncm
             void Delete(const NcmContentId &registeredId);
             bool Has(const NcmContentId &registeredId);
             u64 GetSize(const NcmContentId &registeredId);
+            void Read(const NcmContentId &registeredId, u64 offset, void *buffer, size_t size);
             u64 GetFreeSpace();
             std::string GetPath(const NcmContentId &registeredId);
     };

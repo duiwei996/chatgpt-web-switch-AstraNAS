@@ -39,6 +39,47 @@
         m_forceReinstall = previousForce;
     }
 
+    std::string Install::AuditRegisteredContent(const NcmContentId& contentId)
+    {
+        nx::ncm::ContentStorage storage(m_destStorageId);
+        const u64 size = storage.GetSize(contentId);
+        if (size < sizeof(tin::install::NcaHeader))
+            THROW_FORMAT("Registered NCA is smaller than its crypto header");
+
+        std::array<u8, sizeof(tin::install::NcaHeader)> rawHeader{};
+        storage.Read(contentId, 0, rawHeader.data(), rawHeader.size());
+        const auto decoded = tin::install::DecodeNcaHeaderBytes(rawHeader.data(), rawHeader.size());
+
+        AstraSha256Context hash;
+        std::vector<u8> buffer(256u * 1024u);
+        u64 offset = 0;
+        while (offset < size)
+        {
+            const size_t want = static_cast<size_t>(
+                std::min<u64>(buffer.size(), size - offset));
+            storage.Read(contentId, offset, buffer.data(), want);
+            hash.update(buffer.data(), want);
+            offset += want;
+        }
+
+        const std::string digest = sha256_digest_hex(hash.final());
+        const std::string expected = tin::util::GetNcaIdString(contentId);
+        const bool idMatch = digest.size() >= expected.size() &&
+                             digest.compare(0, expected.size(), expected) == 0;
+
+        std::ostringstream out;
+        out << "registered_size=0x" << std::hex << size
+            << " registered_sha256=" << digest
+            << " content_id_match=" << (idMatch ? "yes" : "no")
+            << " header_mode=" << tin::install::NcaHeaderModeLabel(decoded.mode)
+            << " raw_magic=0x" << decoded.rawMagic
+            << " decrypted_magic=0x" << decoded.decryptedMagic;
+        if (decoded.mode != tin::install::NcaHeaderMode::Invalid)
+            out << " distribution=" << std::dec << static_cast<unsigned>(decoded.header.distribution)
+                << " declared_size=0x" << std::hex << decoded.header.nca_size;
+        return out.str();
+    }
+
     nx::ncm::ContentMeta Install::InstallAndReadCnmtWithRepair(NcmContentInfo& contentInfo)
     {
         nx::ncm::ContentStorage storage(m_destStorageId);
@@ -116,11 +157,20 @@
         catch (...)
         {
             const std::string mountFailure = current_exception_message();
+            std::string registeredAudit;
+            try
+            {
+                registeredAudit = this->AuditRegisteredContent(contentInfo.content_id);
+            }
+            catch (const std::exception& auditError)
+            {
+                registeredAudit = std::string("audit_failed=") + auditError.what();
+            }
             if (existedBefore)
-                THROW_FORMAT("Existing CNMT was replaced with verified package content but mount still failed; before=%s; after=%s",
-                             existingFailure.c_str(), mountFailure.c_str());
-            THROW_FORMAT("New verified CNMT was registered but cannot be mounted: %s",
-                         mountFailure.c_str());
+                THROW_FORMAT("Existing CNMT was replaced with verified package content but mount still failed; before=%s; after=%s; registered_audit=[%s]",
+                             existingFailure.c_str(), mountFailure.c_str(), registeredAudit.c_str());
+            THROW_FORMAT("New verified CNMT was registered but cannot be mounted: %s; registered_audit=[%s]",
+                         mountFailure.c_str(), registeredAudit.c_str());
         }
     }
     const u8* Install::FindExpectedContentHash(const NcmContentId& contentId) const

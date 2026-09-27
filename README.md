@@ -1,8 +1,17 @@
-# AstraNAS v1.0.8
+# AstraNAS v1.1.0
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.1.0 已安装内容管理、原名覆盖下载与注册后 NCA 审计
+
+- “已安装游戏操作”新增完整粒度：`卸载升级包`、`卸载全部 DLC`、`管理 DLC`、`卸载全部游戏内容`、`返回`。单独 DLC 列表支持滚动。
+- 升级包/DLC 部分卸载不直接盲删 NCA：先快照目标 ContentMeta 与 ApplicationRecord，提交 meta 删除后重建应用记录，最后只删除 ContentMeta DB 确认为 orphan 的内容；应用记录写回失败时自动恢复原 meta/record。
+- 单独 DLC 卸载会同时处理 HOS 15+ AddOnContent meta 中声明的关联 DataPatch；“全部 DLC”会删除该应用的全部 AddOnContent/DataPatch，保留本体、升级包和存档。
+- 本机下载继续使用 NAS 原文件名；用户再次下载同名文件时直接覆盖原文件，不再生成随机哈希名，也不再因旧同名文件拒绝下载。UTF-8 中文安全清洗/截断继续保留。
+- 对照 AtmoXL 上游后，NSP/XCI 流统一直接使用唯一 `NcaWriter`，移除重复的 ValidationAware close/header 状态机入口；保留 AstraNAS 的 NCZ、replacement placeholder 和强 Content-ID/CNMT hash 校验。
+- CNMT 注册成功但 mount 失败时，会从 NCM ContentStorage 重新整文件回读并输出 `registered_sha256`、Content-ID match、raw/decrypted magic、header mode、distribution 和 declared size，用于区分“写入后字节变化”与“源 NCA 内部 hierarchical hash 损坏”。不会绕过 FS 完整性错误。
 
 ## v1.0.8 中文下载文件名与原名保留修复
 
@@ -204,7 +213,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.8 主分支下载文件名修复交付，GitHub-hosted workflow 保留一个只匹配“v1.0.7 提交 → v1.0.8”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
+两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.1.0 主分支功能交付，GitHub-hosted workflow 保留一个只匹配“v1.0.8 提交 → v1.1.0”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
 
 本地 devkitPro：
 

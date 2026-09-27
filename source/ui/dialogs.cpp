@@ -263,8 +263,12 @@ int choose_action(Gui& gui,PadState& pad,InputRouter& input,bool& exit_requested
                   const std::string& title,const std::string& detail,
                   const std::vector<std::string>& actions,const std::string& header_title){
     if(actions.empty())return -1;
+    constexpr std::size_t kVisibleRows=5;
     std::size_t choice=0; bool dirty=true;
     while(appletMainLoop()){
+        const std::size_t begin = choice < kVisibleRows ? 0 :
+            std::min(choice-kVisibleRows+1, actions.size()>kVisibleRows?actions.size()-kVisibleRows:0);
+        const std::size_t visible = std::min(kVisibleRows, actions.size()-begin);
         if(dirty){
             gui.begin(); gui.clear(palette::background); gui.fill_rect(0,0,Gui::kWidth,70,palette::navy);
             gui.text(40,16,28,palette::white,header_title.empty() ? astranas::app::kDisplayName : header_title);
@@ -272,11 +276,16 @@ int choose_action(Gui& gui,PadState& pad,InputRouter& input,bool& exit_requested
             gui.text(220,126,27,palette::text,title,840);
             gui.paragraph(220,170,16,palette::muted,detail,840,23,3);
             const int start_y=252; const int row_h=62;
-            for(std::size_t i=0;i<actions.size();++i){
-                const int y=start_y+static_cast<int>(i)*row_h; const bool active=i==choice;
+            for(std::size_t row=0;row<visible;++row){
+                const std::size_t i=begin+row;
+                const int y=start_y+static_cast<int>(row)*row_h; const bool active=i==choice;
                 gui.round_rect(220,y,840,50,10,active?palette::selected:palette::surface_alt);
                 gui.stroke_rect(220,y,840,50,1,palette::border);
                 gui.text(246,y+13,19,active?palette::accent:palette::text,actions[i],780);
+            }
+            if(actions.size()>kVisibleRows){
+                gui.text(920,220,14,palette::muted,
+                         std::to_string(choice+1)+"/"+std::to_string(actions.size()),120);
             }
             gui.button_hint(220,590,"A","选择"); gui.button_hint(448,590,"B","取消",palette::danger); gui.end(); dirty=false;
         }
@@ -288,8 +297,9 @@ int choose_action(Gui& gui,PadState& pad,InputRouter& input,bool& exit_requested
             const int start_y=252,row_h=62;
             if(frame.touch_x>=220&&frame.touch_x<1060&&frame.touch_y>=start_y){
                 const int row=(frame.touch_y-start_y)/row_h;
-                if(row>=0&&static_cast<std::size_t>(row)<actions.size()&&
-                   frame.touch_y<start_y+(row+1)*row_h-12)return row;
+                if(row>=0&&static_cast<std::size_t>(row)<visible&&
+                   frame.touch_y<start_y+(row+1)*row_h-12)
+                    return static_cast<int>(begin+static_cast<std::size_t>(row));
             }
         }
         if(frame.down&HidNpadButton_A)return static_cast<int>(choice);
@@ -298,6 +308,7 @@ int choose_action(Gui& gui,PadState& pad,InputRouter& input,bool& exit_requested
     }
     return -1;
 }
+
 void draw_progress_page(Gui& gui,const std::string& title,const std::string& name,const std::string& detail,
                         std::uint64_t done,std::uint64_t total,double mib_per_sec,int attempt,int max_attempts){
     gui.begin(); gui.clear(palette::background); gui.fill_rect(0,0,Gui::kWidth,70,palette::navy); gui.text(40,16,28,palette::white,astranas::app::kDisplayName);

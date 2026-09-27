@@ -76,6 +76,13 @@ namespace nx::ncm
         return static_cast<u64>(size);
     }
 
+    void ContentStorage::Read(const NcmContentId &registeredId, u64 offset, void *buffer, size_t size)
+    {
+        ASSERT_OK(ncmContentStorageReadContentIdFile(&m_contentStorage, buffer, size,
+                  &registeredId, static_cast<s64>(offset)),
+                  "Failed to read registered NCA bytes");
+    }
+
     u64 ContentStorage::GetFreeSpace()
     {
         s64 size = 0;

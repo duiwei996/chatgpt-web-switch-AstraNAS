@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(astranas VERSION 1.0.8 LANGUAGES C CXX)
+project(astranas VERSION 1.1.0 LANGUAGES C CXX)
 
 if(NOT NINTENDO_SWITCH)
     message(FATAL_ERROR
@@ -22,6 +22,7 @@ add_executable(AstraNAS
     source/ui/pages.cpp
     source/ui/dialogs.cpp
     source/installed/catalog.cpp
+    source/installed/content_manager.cpp
     source/config.cpp
     source/network_runtime.cpp
     source/network_diagnostics.cpp
