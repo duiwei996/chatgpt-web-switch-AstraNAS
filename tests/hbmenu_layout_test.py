@@ -39,8 +39,8 @@ def make_nro(path: Path, title: str, version: str) -> None:
 
 with tempfile.TemporaryDirectory() as td:
     dist = Path(td)
-    make_nro(dist / "switch/AstraNAS/AstraNAS.nro", "Switch游戏安装", "1.1.9")
-    make_nro(dist / "switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro", "Switch网络测速", "1.1.9")
+    make_nro(dist / "switch/AstraNAS/AstraNAS.nro", "Switch游戏安装", "1.1.10")
+    make_nro(dist / "switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro", "Switch网络测速", "1.1.10")
 
     # 这是旧门禁会错误拒绝的布局；标准 AstraNAS.nro 仍存在，
     # 因此额外 NRO 应当被允许。
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory() as td:
     (dist / "switch/AstraNAS/AstraNAS-v1.1.2.nro").write_bytes(b"backup")
 
     subprocess.run(
-        ["python3", str(ROOT / "scripts/check_nro_bundle.py"), str(dist), "1.1.9"],
+        ["python3", str(ROOT / "scripts/check_nro_bundle.py"), str(dist), "1.1.10"],
         check=True,
     )
 

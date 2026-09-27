@@ -121,14 +121,29 @@ namespace tin::install::nsp
                     audit_field(installError.what(), "registered_sha256=");
                 const std::string registeredBodySha256 =
                     audit_field(installError.what(), "registered_body_sha256=");
+                const bool sourceFullHashMatches = !sourceSha256.empty() &&
+                                                   sourceSha256 == registeredSha256;
+                const bool sourceContentIdMatches =
+                    sourceAudit.find("content_id_match=yes") != std::string::npos;
                 const char* comparison = "unavailable";
                 if (compressedCnmt) comparison = "not_applicable_compressed";
                 else if (!sourceBodySha256.empty() && !registeredBodySha256.empty())
                     comparison = sourceBodySha256 == registeredBodySha256 ? "match" : "different";
 
-                THROW_FORMAT("NSP CNMT install/mount failed [entry=%s entry_size=0x%lx content_id=%s source_vs_registered_body_sha256=%s source_full_sha256=%s registered_full_sha256=%s]; cause=[%s]; source_audit=[%s]",
+                const char* fullComparison = "unavailable";
+                if (!sourceSha256.empty() && !registeredSha256.empty())
+                    fullComparison = sourceFullHashMatches ? "match" : "different";
+
+                if (!compressedCnmt && sourceContentIdMatches && sourceFullHashMatches &&
+                    std::string(installError.what()).find("0x001fd602") != std::string::npos) {
+                    THROW_FORMAT("Horizon rejected the registered CNMT NCA filesystem (0x001fd602 / 2002-4075). The source Content ID prefix matches and the source and registered NCA have identical full SHA-256; AstraNAS did not alter the CNMT NCA during transfer or registration, and disabling the optional NCA hash setting will not bypass this system mount check. Check the exact package being installed and the console's CNMT/NCA filesystem state; compare package-specific audit data rather than weakening integrity validation. [source_vs_registered_body_sha256=match source_vs_registered_full_sha256=match source_full_sha256=%s registered_full_sha256=%s registered_audit=[%s] source_audit=[%s]]",
+                                 sourceSha256.c_str(), registeredSha256.c_str(),
+                                 installError.what(), sourceAudit.c_str());
+                }
+
+                THROW_FORMAT("NSP CNMT install/mount failed [entry=%s entry_size=0x%lx content_id=%s source_vs_registered_body_sha256=%s source_vs_registered_full_sha256=%s source_full_sha256=%s registered_full_sha256=%s]; cause=[%s]; source_audit=[%s]",
                              cnmtNcaName.c_str(), static_cast<u64>(fileEntry->fileSize),
-                             tin::util::GetNcaIdString(cnmtContentId).c_str(), comparison,
+                             tin::util::GetNcaIdString(cnmtContentId).c_str(), comparison, fullComparison,
                              sourceSha256.empty() ? "unavailable" : sourceSha256.c_str(),
                              registeredSha256.empty() ? "unavailable" : registeredSha256.c_str(),
                              installError.what(), sourceAudit.c_str());

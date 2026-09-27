@@ -53,7 +53,9 @@ std::string friendly_error(const std::string& action, const std::string& raw) {
     if (lower.find("hierarchical sha-256") != std::string::npos ||
         lower.find("0x001fd602") != std::string::npos ||
         lower.find("2002-4075") != std::string::npos) {
-        if (lower.find("source_vs_registered_body_sha256=different") != std::string::npos)
+        if (lower.find("source_vs_registered_full_sha256=match") != std::string::npos)
+            reason = "Horizon 拒绝挂载 CNMT NCA，但源文件与注册文件完整 SHA-256 相同；这不是传输/写入或可选 NCA SHA 设置造成，详情见 NCA 层级校验日志";
+        else if (lower.find("source_vs_registered_body_sha256=different") != std::string::npos)
             reason = "系统拒绝挂载 CNMT NCA，且源与注册后主体 SHA-256 不同；请查看日志中的审计值，并尝试下载到本机后安装";
         else if (lower.find("source_vs_registered_body_sha256=match") != std::string::npos)
             reason = "系统拒绝挂载 CNMT NCA，但源与注册后主体 SHA-256 相同；请查看日志中的头部审计和系统兼容信息";

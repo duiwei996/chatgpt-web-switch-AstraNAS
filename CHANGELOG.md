@@ -1,5 +1,10 @@
 # AstraNAS 更新记录
 
+## v1.1.10
+
+- 原子替换配置文件前同步临时配置，替换后提交 SD/USB 文件系统；退出后重新打开 AstraNAS 时会恢复下载所在目录。
+- CNMT 的源文件和注册文件全 SHA-256 相同时，明确提示这是 Horizon 挂载校验失败，不是传输或可选 NCA SHA 开关造成；保留完整性校验。
+
 ## v1.1.9
 
 - 通过 libnx 的统一 `switch.h` 头文件引入文件系统 API，修复 devkitPro 构建时 `fsdevCommitDevice` 的 C/C++ 链接名不匹配。

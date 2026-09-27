@@ -7,6 +7,10 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <unistd.h>
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 
 namespace {
 std::string trim(std::string value) {
@@ -27,6 +31,26 @@ bool parse_bool(const std::string& value, bool fallback) {
     if (s == "1" || s == "true" || s == "yes" || s == "on") return true;
     if (s == "0" || s == "false" || s == "no" || s == "off") return false;
     return fallback;
+}
+
+bool commit_config_filesystem(const std::string& path, std::string& error) {
+#ifdef __SWITCH__
+    const std::size_t separator = path.find(":/");
+    if (separator == std::string::npos || separator == 0) return true;
+    const std::string device = path.substr(0, separator);
+    const Result rc = fsdevCommitDevice(device.c_str());
+    if (R_FAILED(rc)) {
+        std::ostringstream out;
+        out << "fsdevCommitDevice(" << device << ") failed (0x"
+            << std::hex << static_cast<u32>(rc) << ")";
+        error = out.str();
+        return false;
+    }
+#else
+    (void)path;
+#endif
+    error.clear();
+    return true;
 }
 
 int parse_int(const std::string& value, int fallback, int low, int high) {
@@ -365,6 +389,24 @@ bool save_config(const std::string& path, const AppConfig& input, std::string& e
     }
     out.close();
 
+    // std::ofstream::flush/close only hands buffered data to the device driver.
+    // Make the temporary file durable before publishing it so a power-off or
+    // app exit cannot leave the previous browsing location in config.ini.
+    FILE* sync_file = std::fopen(temp.c_str(), "rb+");
+    if (!sync_file) {
+        error = "cannot reopen config for sync: " + std::string(std::strerror(errno));
+        std::remove(temp.c_str());
+        return false;
+    }
+    const bool sync_ok = ::fsync(fileno(sync_file)) == 0;
+    const int sync_error = errno;
+    const bool close_ok = std::fclose(sync_file) == 0;
+    if (!sync_ok || !close_ok) {
+        error = "cannot sync config: " + std::string(std::strerror(sync_ok ? errno : sync_error));
+        std::remove(temp.c_str());
+        return false;
+    }
+
     if (std::rename(temp.c_str(), path.c_str()) != 0) {
         const int first = errno;
         if (std::remove(path.c_str()) != 0 && errno != ENOENT) {
@@ -377,6 +419,11 @@ bool save_config(const std::string& path, const AppConfig& input, std::string& e
             std::remove(temp.c_str());
             return false;
         }
+    }
+    std::string commit_error;
+    if (!commit_config_filesystem(path, commit_error)) {
+        error = "config was replaced but filesystem commit failed: " + commit_error;
+        return false;
     }
     error.clear();
     return true;

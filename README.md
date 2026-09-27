@@ -1,8 +1,13 @@
-# AstraNAS v1.1.9
+# AstraNAS v1.1.10
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序支持通过 hbmenu Applet 模式或完整应用模式运行；大型安装建议使用完整应用模式以留出更多内存。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.1.10 本机目录持久化修复
+
+- 原子替换配置文件前同步临时配置，替换后提交 SD/USB 文件系统，确保退出后保存本机浏览位置。
+- 源 CNMT NCA 与注册后的文件全 SHA-256 相同时，错误提示会明确指出系统挂载校验失败；不关闭任何完整性校验。
 
 ## v1.1.9 Switch 链接兼容修复
 
