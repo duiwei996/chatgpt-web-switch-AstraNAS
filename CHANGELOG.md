@@ -1,5 +1,12 @@
 # AstraNAS 更新记录
 
+## v1.0.8
+
+- 本机下载恢复 NAS 原文件名，不再默认追加 16 位对象哈希；远端 object key 继续仅保存在 `.astranas-meta`。
+- 文件名清洗新增完整 UTF-8 校验；合法中文保持原样，非法序列替换为 `_`，超长名称按 UTF-8 字符边界裁剪并保留扩展名，避免中文被截成非法路径后在本机列表中消失。
+- 本机已有同名但无法由 sidecar 证明为同一远端对象时不再静默删除覆盖，而是明确提示用户先处理冲突文件。
+- 新增下载文件名 host regression，并同步 1.0.8 版本与一次性 main 构建门禁。
+
 ## v1.0.7
 
 - 修正 v1.0.6 host regression 的旧路径假设：`not_applicable_compressed` 已迁移到共享 `source_entry_audit.hpp`，测试门禁同步指向新的唯一实现位置。

@@ -12,6 +12,9 @@ python3 tests/hbmenu_layout_test.py
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/batch_queue_touch_test.cpp -Isource -o /tmp/AstraNAS-batch-queue-touch-test
 /tmp/AstraNAS-batch-queue-touch-test
 "$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/batch_install_order_test.cpp -Isource -o /tmp/AstraNAS-batch-install-order-test
+"$CXX" -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/download_filename_test.cpp source/download_cache.cpp source/sha256.cpp -Isource -o /tmp/AstraNAS-download-filename-test
+/tmp/AstraNAS-download-filename-test
+grep -q '本机当前目录已有同名文件，且无法确认来自同一个远端对象' source/app/action_transfer.cpp
 /tmp/AstraNAS-batch-install-order-test
 # Direct-install policy: enabled means real direct install only. Do not silently
 # fall back to cache, and do not force SMB signing at the client.
@@ -81,7 +84,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'b6b8b820a8846e021e9a8f5fca194339c47b1cc8'" .github/workflows/build-nro.yml
+grep -q "github.event.before == '1b7dca93859f6762a1d97618192d8e46abaace00'" .github/workflows/build-nro.yml
+! grep -q 'b6b8b820a8846e021e9a8f5fca194339c47b1cc8' .github/workflows/build-nro.yml
 ! grep -q 'd0cd5b428d94eb3db6b626e7a81161902fe1fcd6' .github/workflows/build-nro.yml
 ! grep -q '2aaad5171cd154e7b89bb16b7b4d4f9cea340bb5' .github/workflows/build-nro.yml
 ! grep -q '7d6b77d4ee8844643242ae65fe415563898878fb' .github/workflows/build-nro.yml

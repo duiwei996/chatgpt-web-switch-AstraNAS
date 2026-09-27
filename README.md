@@ -1,8 +1,15 @@
-# AstraNAS v1.0.7
+# AstraNAS v1.0.8
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.0.8 中文下载文件名与原名保留修复
+
+- “下载到本机当前目录”默认保留 NAS 原文件名，不再给用户可见文件强行追加 16 位远端对象哈希；远端 identity 继续保存在同名 `.astranas-meta` sidecar 中用于断点续传和对象一致性校验。
+- 下载文件名改为完整 UTF-8 清洗与字符边界截断：合法中文/多字节字符原样保留，非法 UTF-8 序列替换为 `_`，超长名称只在完整字符边界裁剪并优先保留 `.nsp/.nsz/.xci/.xcz` 等扩展名。
+- 去掉哈希后补齐同名保护：本机已有同名文件但 sidecar 无法证明它来自同一个远端对象时，拒绝静默删除/覆盖，并提示先重命名、移动或删除；确认是同一对象时仍可直接复用已完成下载。
+- 新增 host 文件名回归，覆盖短中文、超长中文、非法 UTF-8、非法文件名字符、原名保留以及不同远端对象同名场景。
 
 ## v1.0.7 分类回归门禁修正
 
@@ -197,7 +204,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.7 主分支错误分类交付，GitHub-hosted workflow 保留一个只匹配“v1.0.6 提交 → v1.0.7”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
+两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.0.8 主分支下载文件名修复交付，GitHub-hosted workflow 保留一个只匹配“v1.0.7 提交 → v1.0.8”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
 
 本地 devkitPro：
 

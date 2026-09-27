@@ -3,7 +3,7 @@
 #include <cstddef>
 
 namespace astranas::app {
-inline constexpr const char* kVersion = "1.0.7";
+inline constexpr const char* kVersion = "1.0.8";
 inline constexpr const char* kDisplayName = "Switch游戏安装";
 inline constexpr const char* kConfigPath = "sdmc:/switch/AstraNAS/config.ini";
 inline constexpr const char* kBaseDir = "sdmc:/switch/AstraNAS";

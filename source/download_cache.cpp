@@ -21,15 +21,77 @@ std::string basename_of(std::string path) {
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
-std::string sanitize_filename(std::string value) {
-    for (char& c : value) {
-        const unsigned char u = static_cast<unsigned char>(c);
-        if (u < 32 || u == 0x7f || c == '/' || c == '\\' || c == ':' || c == '*' ||
-            c == '?' || c == '"' || c == '<' || c == '>' || c == '|') c = '_';
+bool is_utf8_continuation(unsigned char value) {
+    return (value & 0xC0) == 0x80;
+}
+
+std::string sanitize_filename(const std::string& value) {
+    std::string out;
+    out.reserve(value.size());
+    for (std::size_t i = 0; i < value.size();) {
+        const unsigned char c0 = static_cast<unsigned char>(value[i]);
+        if (c0 < 0x80) {
+            const char c = static_cast<char>(c0);
+            if (c0 < 32 || c0 == 0x7f || c == '/' || c == '\\' || c == ':' || c == '*' ||
+                c == '?' || c == '"' || c == '<' || c == '>' || c == '|') out.push_back('_');
+            else out.push_back(c);
+            ++i;
+            continue;
+        }
+
+        std::size_t width = 0;
+        bool valid = false;
+        if (c0 >= 0xC2 && c0 <= 0xDF) {
+            width = 2;
+            valid = i + width <= value.size() &&
+                    is_utf8_continuation(static_cast<unsigned char>(value[i + 1]));
+        } else if (c0 >= 0xE0 && c0 <= 0xEF) {
+            width = 3;
+            valid = i + width <= value.size() &&
+                    is_utf8_continuation(static_cast<unsigned char>(value[i + 1])) &&
+                    is_utf8_continuation(static_cast<unsigned char>(value[i + 2]));
+            if (valid && c0 == 0xE0) valid = static_cast<unsigned char>(value[i + 1]) >= 0xA0;
+            if (valid && c0 == 0xED) valid = static_cast<unsigned char>(value[i + 1]) < 0xA0;
+        } else if (c0 >= 0xF0 && c0 <= 0xF4) {
+            width = 4;
+            valid = i + width <= value.size() &&
+                    is_utf8_continuation(static_cast<unsigned char>(value[i + 1])) &&
+                    is_utf8_continuation(static_cast<unsigned char>(value[i + 2])) &&
+                    is_utf8_continuation(static_cast<unsigned char>(value[i + 3]));
+            if (valid && c0 == 0xF0) valid = static_cast<unsigned char>(value[i + 1]) >= 0x90;
+            if (valid && c0 == 0xF4) valid = static_cast<unsigned char>(value[i + 1]) <= 0x8F;
+        }
+
+        if (!valid) {
+            out.push_back('_');
+            ++i;
+            continue;
+        }
+        out.append(value, i, width);
+        i += width;
     }
-    while (!value.empty() && (value.back() == ' ' || value.back() == '.')) value.pop_back();
-    if (value.empty()) value = "download.bin";
-    return value;
+
+    while (!out.empty() && (out.back() == ' ' || out.back() == '.')) out.pop_back();
+    if (out.empty()) out = "download.bin";
+    return out;
+}
+
+std::size_t utf8_prefix_bytes(const std::string& value, std::size_t max_bytes) {
+    std::size_t i = 0;
+    std::size_t accepted = 0;
+    while (i < value.size() && i < max_bytes) {
+        const unsigned char c0 = static_cast<unsigned char>(value[i]);
+        std::size_t width = 1;
+        if (c0 < 0x80) width = 1;
+        else if (c0 >= 0xC2 && c0 <= 0xDF) width = 2;
+        else if (c0 >= 0xE0 && c0 <= 0xEF) width = 3;
+        else if (c0 >= 0xF0 && c0 <= 0xF4) width = 4;
+        else break;
+        if (i + width > value.size() || i + width > max_bytes) break;
+        accepted = i + width;
+        i += width;
+    }
+    return accepted;
 }
 
 bool sync_file(std::FILE* file) {
@@ -48,19 +110,20 @@ std::string remote_object_key(const AppConfig& config, const RemoteDirEntry& ent
     return sha256_bytes(material.data(), material.size());
 }
 
-std::string remote_cache_filename(const AppConfig& config, const RemoteDirEntry& entry) {
+std::string remote_cache_filename(const AppConfig&, const RemoteDirEntry& entry) {
+    // User-visible downloads keep the NAS filename. Remote identity belongs in
+    // the .astranas-meta sidecar, not in a hash suffix on the visible file.
     std::string name = sanitize_filename(basename_of(entry.name));
-    const std::string suffix = "-" + remote_object_key(config, entry).substr(0, 16);
     const auto dot = name.find_last_of('.');
     std::string stem = dot == std::string::npos ? name : name.substr(0, dot);
     std::string extension = dot == std::string::npos ? std::string{} : name.substr(dot);
-    constexpr std::size_t kMaxName = 220;
-    const std::size_t reserved = suffix.size() + extension.size();
-    if (reserved >= kMaxName) extension.clear();
-    const std::size_t stemLimit = kMaxName - suffix.size() - extension.size();
-    if (stem.size() > stemLimit) stem.resize(stemLimit);
+
+    constexpr std::size_t kMaxNameBytes = 220;
+    if (extension.size() >= kMaxNameBytes) extension.clear();
+    const std::size_t stemLimit = kMaxNameBytes - extension.size();
+    if (stem.size() > stemLimit) stem.resize(utf8_prefix_bytes(stem, stemLimit));
     if (stem.empty()) stem = "download";
-    return stem + suffix + extension;
+    return stem + extension;
 }
 
 bool read_transfer_metadata(const std::string& path, TransferMetadata& metadata) {

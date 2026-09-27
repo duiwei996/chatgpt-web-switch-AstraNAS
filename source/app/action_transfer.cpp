@@ -219,8 +219,9 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
             }
         }
         if (reusable) { status = std::string(phase) + "已完成，可直接使用：" + basename_of(destination); return true; }
-        std::remove(destination.c_str());
-        std::remove(final_meta_path.c_str());
+        status = "本机当前目录已有同名文件，且无法确认来自同一个远端对象；为避免覆盖，请先重命名、移动或删除该文件：" +
+                 basename_of(destination);
+        return false;
     }
 
     TransferMetadata partial_metadata;
