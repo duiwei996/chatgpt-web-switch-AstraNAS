@@ -94,6 +94,28 @@ std::size_t utf8_prefix_bytes(const std::string& value, std::size_t max_bytes) {
     return accepted;
 }
 
+std::size_t utf8_suffix_start(const std::string& value, std::size_t max_bytes) {
+    if (value.size() <= max_bytes) return 0;
+    std::size_t start = value.size() - max_bytes;
+    while (start < value.size() &&
+           is_utf8_continuation(static_cast<unsigned char>(value[start]))) ++start;
+    return start;
+}
+
+std::string shorten_utf8_middle(const std::string& value, std::size_t max_bytes) {
+    if (value.size() <= max_bytes) return value;
+    if (max_bytes <= 1) return value.substr(0, utf8_prefix_bytes(value, max_bytes));
+    constexpr char marker = '~';
+    const std::size_t payload = max_bytes - 1;
+    const std::size_t left_budget = (payload + 1) / 2;
+    const std::size_t right_budget = payload - left_budget;
+    const std::size_t left_end = utf8_prefix_bytes(value, left_budget);
+    const std::size_t right_start = utf8_suffix_start(value, right_budget);
+    if (left_end == 0 || right_start <= left_end)
+        return value.substr(0, utf8_prefix_bytes(value, max_bytes));
+    return value.substr(0, left_end) + marker + value.substr(right_start);
+}
+
 bool sync_file(std::FILE* file) {
     if (std::fflush(file) != 0) return false;
 #ifdef _WIN32
@@ -110,19 +132,34 @@ std::string remote_object_key(const AppConfig& config, const RemoteDirEntry& ent
     return sha256_bytes(material.data(), material.size());
 }
 
-std::string remote_cache_filename(const AppConfig&, const RemoteDirEntry& entry) {
-    // User-visible downloads keep the NAS filename. Remote identity belongs in
-    // the .astranas-meta sidecar, not in a hash suffix on the visible file.
+std::string remote_cache_filename(const AppConfig& config, const RemoteDirEntry& entry) {
+    // Keep the exact NAS filename whenever it safely fits. If a component or the
+    // complete Switch path would be too long, shorten the middle deterministically
+    // (never append a random/object hash) and keep the extension.
     std::string name = sanitize_filename(basename_of(entry.name));
     const auto dot = name.find_last_of('.');
     std::string stem = dot == std::string::npos ? name : name.substr(0, dot);
     std::string extension = dot == std::string::npos ? std::string{} : name.substr(dot);
 
-    constexpr std::size_t kMaxNameBytes = 220;
-    if (extension.size() >= kMaxNameBytes) extension.clear();
-    const std::size_t stemLimit = kMaxNameBytes - extension.size();
-    if (stem.size() > stemLimit) stem.resize(utf8_prefix_bytes(stem, stemLimit));
+    constexpr std::size_t kMaxVisibleNameBytes = 180;
+    constexpr std::size_t kSwitchPathBudget = 0x300;
+    constexpr std::size_t kLongestSidecarSuffix = sizeof(".astranas-meta.new") - 1;
+    std::size_t nameLimit = kMaxVisibleNameBytes;
+    if (!config.local_dir.empty()) {
+        const std::size_t separator = config.local_dir.back() == '/' ? 0 : 1;
+        const std::size_t fixed = config.local_dir.size() + separator + kLongestSidecarSuffix;
+        if (fixed < kSwitchPathBudget)
+            nameLimit = std::min(nameLimit, kSwitchPathBudget - fixed);
+        else
+            nameLimit = 8;
+    }
+
+    if (extension.size() >= nameLimit) extension.clear();
+    const std::size_t stemLimit = nameLimit > extension.size() ? nameLimit - extension.size() : 0;
+    stem = shorten_utf8_middle(stem, stemLimit);
     if (stem.empty()) stem = "download";
+    if (stem.size() + extension.size() > nameLimit)
+        extension.clear();
     return stem + extension;
 }
 

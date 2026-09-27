@@ -1,8 +1,17 @@
-# AstraNAS v1.1.1
+# AstraNAS v1.1.2
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.1.2 动态已安装内容、DLC 管理初始化与本机下载可见性修复
+
+- 已安装列表新增 DLC 数量，并在每次 live refresh 都从系统 ContentMeta 状态重新读取本体、升级包和 DLC；只有实际存在升级包时才显示“卸载升级包”，只有 DLC 数量大于 0 时才显示“卸载全部 DLC / 管理 DLC”。
+- 修复 DLC 管理只初始化普通 NS service、却调用 ns_ext ApplicationManagerInterface 的问题：Runtime 改用 `nsextInitialize()/nsextExit()` 管理完整服务生命周期。
+- 修复通用错误翻译把任意 Switch 十六进制 Result 中出现的 “401/403” 误判为 HTTP 鉴权失败；401/403 现在只在 HTTP/WebDAV/curl 响应上下文触发“检查用户名和密码”。
+- NAS 下载继续优先保持完整原文件名、同名直接覆盖；过长名称不再随机命名，而是在 UTF-8 字符边界确定性压缩中间部分并保留首尾/扩展名，同时按当前目录计算完整 Switch 路径预算。
+- 下载成功后立即刷新当前本机目录，并验证目标路径既存在又能被目录枚举回读；失败会明确输出实际目标路径，成功状态也会显示“保存位置”，便于定位中文/超长名称问题。
+- 根据 v1.1.1 注册后审计证据，`0x001fd602 / 2002-4075` 且注册实体仍 `content_id_match=yes` 时直接归类为 CNMT 内部 hierarchical SHA-256/hash tree 不一致，提示重新获取或重建安装包，不降低 Horizon 完整性校验。
 
 ## v1.1.1 NS 扩展 C ABI 链接修复
 

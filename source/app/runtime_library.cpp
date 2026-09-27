@@ -55,34 +55,49 @@ void Runtime::handle_installed(const InputFrame& frame) {
 
     const auto entry = installed_entries_[installed_sel_];
     const std::string label = entry.name.empty() ? title_id_text(entry.application_id) : entry.name;
-    std::vector<astranas::installed::ManagedContentMeta> dlcs;
-    std::string dlc_error;
-    const bool dlc_list_ok = astranas::installed::list_dlc(entry.application_id, dlcs, dlc_error);
+
+    enum class InstalledAction { RemoveUpdate, RemoveAllDlc, ManageDlc, RemoveAll, Back };
+    std::vector<std::string> labels;
+    std::vector<InstalledAction> actions;
+    if (entry.patch_version) {
+        labels.push_back("卸载升级包");
+        actions.push_back(InstalledAction::RemoveUpdate);
+    }
+    if (entry.dlc_count) {
+        labels.push_back("卸载全部 DLC（" + std::to_string(entry.dlc_count) + "）");
+        actions.push_back(InstalledAction::RemoveAllDlc);
+        labels.push_back("管理 DLC（" + std::to_string(entry.dlc_count) + "）");
+        actions.push_back(InstalledAction::ManageDlc);
+    }
+    labels.push_back("卸载全部游戏内容");
+    actions.push_back(InstalledAction::RemoveAll);
+    labels.push_back("返回");
+    actions.push_back(InstalledAction::Back);
 
     std::ostringstream detail;
     detail << label << "\nTitle ID：" << title_id_text(entry.application_id)
            << "\n升级包：" << (entry.patch_version ? ("v" + std::to_string(entry.patch_version)) : "未安装")
-           << " · DLC：" << (dlc_list_ok ? std::to_string(dlcs.size()) : "状态未知");
+           << " · DLC：" << entry.dlc_count;
 
     const int choice = astranas::ui::choose_action(
-        gui_, pad_, input_, exit_requested_, "已安装游戏操作", detail.str(),
-        {"卸载升级包", "卸载全部 DLC", "管理 DLC", "卸载全部游戏内容", "返回"});
-    if (choice < 0 || choice == 4) return;
+        gui_, pad_, input_, exit_requested_, "已安装游戏操作", detail.str(), labels);
+    if (choice < 0 || static_cast<std::size_t>(choice) >= actions.size()) return;
+    const auto action = actions[static_cast<std::size_t>(choice)];
+    if (action == InstalledAction::Back) return;
 
-    auto finish_partial = [&](const std::string& action,
+    auto finish_partial = [&](const std::string& action_name,
                               const astranas::installed::RemovalSummary& summary) {
         installed_stage_ = 1;
         refresh_installed_live();
         std::ostringstream out;
-        out << action << "完成：删除 " << summary.meta_records << " 条内容记录";
+        out << action_name << "完成：删除 " << summary.meta_records << " 条内容记录";
         if (summary.content_files) out << "，清理 " << summary.content_files << " 个 orphan NCA";
         if (!summary.warning.empty()) out << "；" << summary.warning;
         status_ = out.str();
         if (installed_sel_ >= installed_entries_.size() && installed_sel_ > 0) --installed_sel_;
     };
 
-    if (choice == 0) {
-        if (!entry.patch_version) { status_ = "当前游戏没有已安装升级包"; return; }
+    if (action == InstalledAction::RemoveUpdate) {
         if (!astranas::ui::confirm_action(
                 gui_, pad_, exit_requested_, "卸载升级包",
                 label + "\n只删除 Patch/升级内容；保留游戏本体、DLC 和存档。",
@@ -93,19 +108,17 @@ void Runtime::handle_installed(const InputFrame& frame) {
         astranas::installed::RemovalSummary summary;
         std::string error;
         if (!astranas::installed::remove_update(entry.application_id, summary, error)) {
-            status_ = friendly_error("卸载升级包失败", error);
+            status_ = "卸载升级包失败：" + error;
             return;
         }
         finish_partial("升级包卸载", summary);
         return;
     }
 
-    if (choice == 1) {
-        if (!dlc_list_ok) { status_ = friendly_error("无法读取 DLC", dlc_error); return; }
-        if (dlcs.empty()) { status_ = "当前游戏没有已安装 DLC"; return; }
+    if (action == InstalledAction::RemoveAllDlc) {
         if (!astranas::ui::confirm_action(
                 gui_, pad_, exit_requested_, "卸载全部 DLC",
-                label + "\n将删除全部 " + std::to_string(dlcs.size()) +
+                label + "\n将删除全部 " + std::to_string(entry.dlc_count) +
                     " 个 DLC 及其 DataPatch；保留游戏本体、升级包和存档。",
                 "确认卸载全部 DLC", "取消")) {
             if (!exit_requested_) status_ = "卸载全部 DLC 已取消";
@@ -114,27 +127,36 @@ void Runtime::handle_installed(const InputFrame& frame) {
         astranas::installed::RemovalSummary summary;
         std::string error;
         if (!astranas::installed::remove_all_dlc(entry.application_id, summary, error)) {
-            status_ = friendly_error("卸载全部 DLC 失败", error);
+            status_ = "卸载全部 DLC 失败：" + error;
             return;
         }
         finish_partial("全部 DLC 卸载", summary);
         return;
     }
 
-    if (choice == 2) {
-        if (!dlc_list_ok) { status_ = friendly_error("无法读取 DLC", dlc_error); return; }
-        if (dlcs.empty()) { status_ = "当前游戏没有已安装 DLC"; return; }
-        std::vector<std::string> labels;
-        labels.reserve(dlcs.size());
-        for (const auto& dlc : dlcs) {
-            labels.push_back("DLC " + title_id_text(dlc.id) + " · v" + std::to_string(dlc.version));
+    if (action == InstalledAction::ManageDlc) {
+        std::vector<astranas::installed::ManagedContentMeta> dlcs;
+        std::string error;
+        if (!astranas::installed::list_dlc(entry.application_id, dlcs, error)) {
+            status_ = "读取 DLC 列表失败：" + error;
+            return;
         }
+        if (dlcs.empty()) {
+            installed_stage_ = 1;
+            refresh_installed_live();
+            status_ = "DLC 状态已变化：当前没有可管理的 DLC";
+            return;
+        }
+        std::vector<std::string> dlc_labels;
+        dlc_labels.reserve(dlcs.size());
+        for (const auto& dlc : dlcs)
+            dlc_labels.push_back("DLC " + title_id_text(dlc.id) + " · v" + std::to_string(dlc.version));
         const int selected = astranas::ui::choose_action(
             gui_, pad_, input_, exit_requested_, "管理 DLC",
-            label + "\n选择一个 DLC 单独卸载；↑↓ 可滚动全部项目。", labels);
+            label + "\n已安装 DLC：" + std::to_string(dlcs.size()) + " · 选择一个单独卸载。", dlc_labels);
         if (selected < 0 || static_cast<std::size_t>(selected) >= dlcs.size()) return;
         const auto dlc = dlcs[static_cast<std::size_t>(selected)];
-        const std::string dlc_label = labels[static_cast<std::size_t>(selected)];
+        const std::string dlc_label = dlc_labels[static_cast<std::size_t>(selected)];
         if (!astranas::ui::confirm_action(
                 gui_, pad_, exit_requested_, "卸载单个 DLC",
                 dlc_label + "\n只删除该 DLC 及其关联 DataPatch；不删除本体、升级包或存档。",
@@ -143,16 +165,15 @@ void Runtime::handle_installed(const InputFrame& frame) {
             return;
         }
         astranas::installed::RemovalSummary summary;
-        std::string error;
         if (!astranas::installed::remove_dlc(entry.application_id, dlc, summary, error)) {
-            status_ = friendly_error("卸载 DLC 失败", error);
+            status_ = "卸载 DLC 失败：" + error;
             return;
         }
         finish_partial("DLC 卸载", summary);
         return;
     }
 
-    if (choice == 3) {
+    if (action == InstalledAction::RemoveAll) {
         if (!astranas::ui::confirm_action(
                 gui_, pad_, exit_requested_, "卸载全部游戏内容",
                 label + "\n" + title_id_text(entry.application_id) +

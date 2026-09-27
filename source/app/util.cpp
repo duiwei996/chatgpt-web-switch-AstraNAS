@@ -46,9 +46,16 @@ std::string friendly_error(const std::string& action, const std::string& raw) {
     append_debug_log(action, raw);
     const std::string lower = lower_copy(raw);
     std::string reason = "发生错误，请检查设置后重试";
+    const bool http_context = lower.find("http") != std::string::npos ||
+                              lower.find("webdav") != std::string::npos ||
+                              lower.find("curl") != std::string::npos ||
+                              lower.find("response") != std::string::npos;
     if (lower.find("cancel") != std::string::npos) reason = "操作已取消";
     else if (lower.find("timeout") != std::string::npos || lower.find("timed out") != std::string::npos) reason = "连接超时，请检查网络和服务器状态";
-    else if (lower.find("401") != std::string::npos || lower.find("403") != std::string::npos || lower.find("auth") != std::string::npos || lower.find("password") != std::string::npos || lower.find("credential") != std::string::npos) reason = "身份验证失败，请检查用户名和密码";
+    else if ((http_context && (lower.find("401") != std::string::npos || lower.find("403") != std::string::npos)) ||
+             lower.find("auth") != std::string::npos || lower.find("password") != std::string::npos ||
+             lower.find("credential") != std::string::npos || lower.find("logon failure") != std::string::npos)
+        reason = "身份验证失败，请检查用户名和密码";
     else if (lower.find("404") != std::string::npos || lower.find("not found") != std::string::npos || lower.find("no such") != std::string::npos) reason = "目标不存在，请刷新目录或检查路径";
     else if (lower.find("certificate") != std::string::npos || lower.find("tls") != std::string::npos || lower.find("ssl") != std::string::npos) reason = "安全连接验证失败，请检查证书或 TLS 设置";
     else if (lower.find("resolve") != std::string::npos || lower.find("dns") != std::string::npos || lower.find("host") != std::string::npos) reason = "无法解析服务器地址，请检查地址和 DNS";

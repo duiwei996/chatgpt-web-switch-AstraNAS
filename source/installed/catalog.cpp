@@ -67,10 +67,10 @@ bool write_bytes_atomic(const std::string& path, const void* data, std::size_t s
 bool save_cache(const std::string& cache_dir, const std::vector<TitleEntry>& entries, std::string& error) {
     if (!local_mkdir_p(cache_dir)) { error = "无法创建游戏信息缓存目录"; return false; }
     std::ostringstream text;
-    text << "# AstraNAS installed cache v2\n";
+    text << "# AstraNAS installed cache v3\n";
     for (const auto& entry : entries) {
         text << title_hex(entry.application_id) << '\t' << entry.base_version << '\t' << entry.patch_version << '\t'
-             << static_cast<int>(entry.storage) << '\t' << entry.last_updated << '\t'
+             << entry.dlc_count << '\t' << static_cast<int>(entry.storage) << '\t' << entry.last_updated << '\t'
              << hex_encode(entry.name) << '\t' << hex_encode(entry.publisher) << '\t' << hex_encode(entry.display_version) << '\n';
     }
     const std::string data = text.str();
@@ -78,8 +78,9 @@ bool save_cache(const std::string& cache_dir, const std::vector<TitleEntry>& ent
     return true;
 }
 bool read_versions(std::uint64_t application_id, std::uint32_t& base_version,
-                   std::uint32_t& patch_version, NcmStorageId& storage) {
-    base_version = patch_version = 0; storage = NcmStorageId_None;
+                   std::uint32_t& patch_version, std::uint32_t& dlc_count,
+                   NcmStorageId& storage) {
+    base_version = patch_version = dlc_count = 0; storage = NcmStorageId_None;
     s32 meta_count = 0;
     if (R_FAILED(nsCountApplicationContentMeta(application_id, &meta_count)) || meta_count <= 0 || meta_count > 256) return false;
     std::vector<NsApplicationContentMetaStatus> statuses(static_cast<std::size_t>(meta_count));
@@ -89,6 +90,7 @@ bool read_versions(std::uint64_t application_id, std::uint32_t& base_version,
         const auto& content = statuses[static_cast<std::size_t>(i)];
         if (content.meta_type == NcmContentMetaType_Application) { base_version = std::max(base_version, content.version); storage = static_cast<NcmStorageId>(content.storageID); }
         else if (content.meta_type == NcmContentMetaType_Patch) { patch_version = std::max(patch_version, content.version); storage = static_cast<NcmStorageId>(content.storageID); }
+        else if (content.meta_type == NcmContentMetaType_AddOnContent) { ++dlc_count; }
     }
     return true;
 }
@@ -109,17 +111,24 @@ bool load_cache(const std::string& cache_dir, std::vector<TitleEntry>& entries, 
             fields.push_back(line.substr(start, end == std::string::npos ? std::string::npos : end - start));
             if (end == std::string::npos) break; start = end + 1;
         }
-        if (fields.size() != 7 && fields.size() != 8) continue;
+        if (fields.size() != 7 && fields.size() != 8 && fields.size() != 9) continue;
+        const bool v3 = fields.size() == 9;
         const bool v2 = fields.size() == 8;
         TitleEntry entry{};
         try {
             entry.application_id = std::stoull(fields[0], nullptr, 16);
             entry.base_version = static_cast<std::uint32_t>(std::stoul(fields[1]));
             entry.patch_version = static_cast<std::uint32_t>(std::stoul(fields[2]));
-            entry.storage = static_cast<NcmStorageId>(std::stoi(fields[3]));
-            if (v2) entry.last_updated = std::stoull(fields[4]);
+            if (v3) {
+                entry.dlc_count = static_cast<std::uint32_t>(std::stoul(fields[3]));
+                entry.storage = static_cast<NcmStorageId>(std::stoi(fields[4]));
+                entry.last_updated = std::stoull(fields[5]);
+            } else {
+                entry.storage = static_cast<NcmStorageId>(std::stoi(fields[3]));
+                if (v2) entry.last_updated = std::stoull(fields[4]);
+            }
         } catch (...) { continue; }
-        const std::size_t text_base = v2 ? 5 : 4;
+        const std::size_t text_base = v3 ? 6 : (v2 ? 5 : 4);
         if (!hex_decode(fields[text_base], entry.name) || !hex_decode(fields[text_base + 1], entry.publisher) || !hex_decode(fields[text_base + 2], entry.display_version)) continue;
         entries.push_back(std::move(entry));
     }
@@ -147,11 +156,16 @@ bool refresh(const std::string& cache_dir, std::vector<TitleEntry>& entries, std
             const auto cached = previous_by_id.find(entry.application_id);
             const std::string jpeg = icon_path(cache_dir, entry.application_id);
             const bool unchanged = cached != previous_by_id.end() && cached->second.last_updated != 0 && cached->second.last_updated == entry.last_updated && file_exists(jpeg);
+            if (!read_versions(entry.application_id, entry.base_version, entry.patch_version, entry.dlc_count, entry.storage) &&
+                cached != previous_by_id.end()) {
+                entry.base_version = cached->second.base_version;
+                entry.patch_version = cached->second.patch_version;
+                entry.dlc_count = cached->second.dlc_count;
+                entry.storage = cached->second.storage;
+            }
             if (unchanged) {
-                entry.base_version = cached->second.base_version; entry.patch_version = cached->second.patch_version;
-                entry.storage = cached->second.storage; entry.name = cached->second.name; entry.publisher = cached->second.publisher; entry.display_version = cached->second.display_version;
+                entry.name = cached->second.name; entry.publisher = cached->second.publisher; entry.display_version = cached->second.display_version;
             } else {
-                read_versions(entry.application_id, entry.base_version, entry.patch_version, entry.storage);
                 auto control = std::make_unique<NsApplicationControlData>(); u64 actual_size = 0;
                 if (R_SUCCEEDED(nsGetApplicationControlData(NsApplicationControlSource_Storage, entry.application_id,
                                     control.get(), sizeof(*control), &actual_size)) && actual_size >= sizeof(NacpStruct)) {

@@ -11,6 +11,7 @@ struct TitleEntry {
     std::uint64_t application_id = 0;
     std::uint32_t base_version = 0;
     std::uint32_t patch_version = 0;
+    std::uint32_t dlc_count = 0;
     NcmStorageId storage = NcmStorageId_None;
     std::uint64_t last_updated = 0;
     std::string name;

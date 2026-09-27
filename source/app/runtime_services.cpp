@@ -8,6 +8,7 @@
 #include "../config.hpp"
 #include "../download_cache.hpp"
 #include "../installed/catalog.hpp"
+#include "../atmo_xl/include/nx/ipc/tin_ipc.h"
 #include "../local_fs.hpp"
 #include "../network_runtime.hpp"
 #include "../remote/remote_client.hpp"
@@ -84,8 +85,8 @@ bool Runtime::ensure_ns() {
     if (ns_ready_) return true;
     if (ns_attempted_) return false;
     ns_attempted_ = true;
-    ns_ready_ = R_SUCCEEDED(nsInitialize());
-    if (!ns_ready_) status_ = "系统应用服务不可用，暂时无法读取已安装游戏";
+    ns_ready_ = R_SUCCEEDED(nsextInitialize());
+    if (!ns_ready_) status_ = "系统应用管理服务不可用，暂时无法读取或管理已安装游戏";
     return ns_ready_;
 }
 bool Runtime::ensure_usb() {

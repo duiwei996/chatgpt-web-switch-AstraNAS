@@ -29,6 +29,7 @@ int main() {
     AppConfig config;
     config.url = "smb://nas/Games";
     config.username = "tester";
+    config.local_dir = "sdmc:/";
 
     RemoteDirEntry entry;
     entry.name = "塞尔达传说 王国之泪.nsp";
@@ -54,10 +55,18 @@ int main() {
     for (int i = 0; i < 100; ++i) entry.name += "中";
     entry.name += ".nsp";
     const std::string long_chinese = remote_cache_filename(config, entry);
-    assert(long_chinese.size() <= 220);
+    assert(long_chinese.size() <= 180);
     assert(long_chinese.size() >= 4);
     assert(long_chinese.compare(long_chinese.size() - 4, 4, ".nsp") == 0);
+    assert(long_chinese.find('~') != std::string::npos);
     assert(valid_utf8(long_chinese));
+
+    config.local_dir = "sdmc:/" + std::string(650, 'd');
+    const std::string deep_name = remote_cache_filename(config, entry);
+    assert(config.local_dir.size() + 1 + deep_name.size() + sizeof(".astranas-meta.new") - 1 <= 0x300);
+    assert(deep_name.size() >= 4);
+    assert(valid_utf8(deep_name));
+    config.local_dir = "sdmc:/";
 
     RemoteDirEntry same_name_a{};
     same_name_a.name = "游戏.nsp";

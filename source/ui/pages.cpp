@@ -226,8 +226,39 @@ void draw_cache(Gui& gui,const std::vector<LocalEntry>& entries,std::size_t sele
 }
 
 void draw_installed(Gui&gui,const std::vector<astranas::installed::TitleEntry>&entries,std::size_t selected,const std::map<std::uint64_t,astranas::installed::IconBitmap>&icons,const std::string&protocol,const std::string&status,bool show_cache){
-    gui.begin();draw_shell(gui,Tab::Installed,protocol,status,show_cache);panel(gui,40,198,830,430,"已安装游戏");gui.text(58,246,16,palette::muted,"图标和名称会缓存；系统记录未变化时直接复用缓存");const auto begin=begin_for(selected,entries.size(),7),end=std::min(entries.size(),begin+7);if(entries.empty())gui.text(58,315,19,palette::muted,"没有缓存；首次进入会读取系统游戏列表");for(std::size_t i=begin;i<end;++i){const int y=282+static_cast<int>(i-begin)*48;const auto&e=entries[i];const bool active=i==selected;if(active)gui.round_rect(52,y,806,44,8,palette::selected);const auto icon=icons.find(e.application_id);if(icon!=icons.end())gui.image_rgb(62,y+4,36,36,icon->second.rgb.data(),icon->second.width,icon->second.height);else{gui.round_rect(62,y+4,36,36,6,palette::surface_alt);gui.text(70,y+13,14,palette::muted,"游");}const std::string label=e.name.empty()?title_id_text(e.application_id):e.name;gui.text(112,y+5,17,palette::text,label,480);gui.text(605,y+6,14,palette::muted,"本体 v"+std::to_string(e.base_version)+"  更新 v"+std::to_string(e.patch_version),240);}
-    panel(gui,890,198,350,430,"所选游戏");if(selected<entries.size()){const auto&e=entries[selected];const auto icon=icons.find(e.application_id);if(icon!=icons.end())gui.image_rgb(910,258,96,96,icon->second.rgb.data(),icon->second.width,icon->second.height);const std::string label=e.name.empty()?title_id_text(e.application_id):e.name;gui.text(1018,258,19,palette::text,label,200);gui.text(910,376,15,palette::muted,"Title ID");gui.text(910,400,16,palette::text,title_id_text(e.application_id),300);if(!e.display_version.empty()){gui.text(910,438,15,palette::muted,"显示版本");gui.text(910,462,17,palette::text,e.display_version,300);}if(!e.publisher.empty()){gui.text(910,500,15,palette::muted,"发行方");gui.text(910,524,16,palette::text,e.publisher,300);}gui.paragraph(910,564,14,palette::muted,"卸载只删除已安装内容，不主动删除游戏存档。",300,22,3);}gui.button_hint(48,654,"A","游戏操作");gui.button_hint(270,654,"Y","刷新游戏列表",palette::accent);gui.end();
+    gui.begin();draw_shell(gui,Tab::Installed,protocol,status,show_cache);
+    panel(gui,40,198,830,430,"已安装游戏");
+    gui.text(58,246,16,palette::muted,"只显示实际已安装的更新/DLC；DLC 数量来自系统 ContentMeta 状态",790);
+    const auto begin=begin_for(selected,entries.size(),7),end=std::min(entries.size(),begin+7);
+    if(entries.empty())gui.text(58,315,19,palette::muted,"没有缓存；首次进入会读取系统游戏列表");
+    for(std::size_t i=begin;i<end;++i){
+        const int y=282+static_cast<int>(i-begin)*48;const auto&e=entries[i];const bool active=i==selected;
+        if(active)gui.round_rect(52,y,806,44,8,palette::selected);
+        const auto icon=icons.find(e.application_id);
+        if(icon!=icons.end())gui.image_rgb(62,y+4,36,36,icon->second.rgb.data(),icon->second.width,icon->second.height);
+        else{gui.round_rect(62,y+4,36,36,6,palette::surface_alt);gui.text(70,y+13,14,palette::muted,"游");}
+        const std::string label=e.name.empty()?title_id_text(e.application_id):e.name;
+        gui.text(112,y+5,17,palette::text,label,450);
+        std::string content="本体 v"+std::to_string(e.base_version);
+        if(e.patch_version)content+=" · 更新 v"+std::to_string(e.patch_version);
+        if(e.dlc_count)content+=" · DLC "+std::to_string(e.dlc_count);
+        gui.text(570,y+6,14,palette::muted,content,280);
+    }
+    panel(gui,890,198,350,430,"所选游戏");
+    if(selected<entries.size()){
+        const auto&e=entries[selected];const auto icon=icons.find(e.application_id);
+        if(icon!=icons.end())gui.image_rgb(910,258,96,96,icon->second.rgb.data(),icon->second.width,icon->second.height);
+        const std::string label=e.name.empty()?title_id_text(e.application_id):e.name;
+        gui.text(1018,258,19,palette::text,label,200);
+        gui.text(910,376,15,palette::muted,"Title ID");gui.text(910,400,16,palette::text,title_id_text(e.application_id),300);
+        std::string installed="本体 v"+std::to_string(e.base_version);
+        if(e.patch_version)installed+=" · 更新 v"+std::to_string(e.patch_version);
+        installed+=" · DLC "+std::to_string(e.dlc_count);
+        gui.text(910,438,15,palette::muted,"已安装内容");gui.text(910,462,16,palette::text,installed,300);
+        if(!e.display_version.empty()){gui.text(910,500,15,palette::muted,"显示版本");gui.text(910,524,17,palette::text,e.display_version,300);}
+        gui.paragraph(910,564,14,palette::muted,"A 打开按实际状态生成的卸载菜单；不会主动删除游戏存档。",300,22,3);
+    }
+    gui.button_hint(48,654,"A","游戏操作");gui.button_hint(270,654,"Y","刷新游戏列表",palette::accent);gui.end();
 }
 
 const char* setting_label(std::size_t index){

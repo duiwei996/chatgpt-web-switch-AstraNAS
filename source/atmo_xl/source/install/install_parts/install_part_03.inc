@@ -166,6 +166,13 @@
             {
                 registeredAudit = std::string("audit_failed=") + auditError.what();
             }
+            const bool verifiedRegisteredBytes =
+                registeredAudit.find("content_id_match=yes") != std::string::npos;
+            const bool hierarchicalHashFailure =
+                mountFailure.find("0x001fd602") != std::string::npos;
+            if (verifiedRegisteredBytes && hierarchicalHashFailure)
+                THROW_FORMAT("Verified CNMT bytes match the Content ID before/after registration, but Horizon rejected the NCA internal hierarchical SHA-256 (0x001fd602 / 2002-4075). The package CNMT filesystem hash tree is inconsistent; reacquire or rebuild the package. mount=[%s]; registered_audit=[%s]",
+                             mountFailure.c_str(), registeredAudit.c_str());
             if (existedBefore)
                 THROW_FORMAT("Existing CNMT was replaced with verified package content but mount still failed; before=%s; after=%s; registered_audit=[%s]",
                              existingFailure.c_str(), mountFailure.c_str(), registeredAudit.c_str());

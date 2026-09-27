@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "runtime_internal.hpp"
 #ifdef __SWITCH__
+#include "../atmo_xl/include/nx/ipc/tin_ipc.h"
+#endif
+#ifdef __SWITCH__
 #include "runtime_helpers.hpp"
 #include "actions.hpp"
 #include "constants.hpp"
@@ -218,7 +221,7 @@ void Runtime::shutdown() {
     remote_.reset();
     persist_local_state();
     if (usb_ready_) astranas::usb_storage::finalize();
-    if (ns_ready_) nsExit();
+    if (ns_ready_) nsextExit();
     if (nifm_ready_) nifmExit();
     if (curl_ready_) curl_global_cleanup();
     if (socket_ready_) socketExit();

@@ -1,5 +1,15 @@
 # AstraNAS 更新记录
 
+## v1.1.2
+
+- 已安装列表显示 DLC 个数；升级包/DLC 操作菜单改为按实际安装状态动态出现。
+- Runtime 使用 `nsextInitialize/nsextExit` 初始化部分卸载真正依赖的 ApplicationManagerInterface，修复“管理 DLC”调用失败。
+- HTTP 401/403 错误翻译限定在网络响应上下文，避免 Switch Result 被误报为“检查用户名和密码”。
+- 中文下载保留原名优先；超长名称按 UTF-8 字符边界确定性缩短中间部分，并考虑当前目录完整路径预算，不生成随机名。
+- 下载完成立即刷新并回读本机目录；若目标文件存在但无法被本机枚举会直接报出保存路径，成功也显示实际保存位置。
+- 已验证注册后 Content-ID 的 CNMT 若 mount 返回 `0x001fd602`，明确分类为 NCA 内部 hierarchical SHA-256/hash tree 不一致并建议重新获取/重建包。
+- 版本升级为 1.1.2，并为本次 v1.1.1 → v1.1.2 main 修复设置一次性 GitHub-hosted 构建门禁。
+
 ## v1.1.1
 
 - 修复 v1.1.0 部分卸载模块对 NS 扩展函数的 C/C++ linkage：统一通过 `tin_ipc.h` 的 `extern "C"` 包装引用，解决最终链接 undefined reference。

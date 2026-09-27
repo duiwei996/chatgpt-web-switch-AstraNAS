@@ -286,9 +286,25 @@ void Runtime::handle_remote(const InputFrame& frame, ActionContext& ctx) {
             AppConfig transfer_config = config_;
             transfer_config.local_root = local_root_;
             transfer_config.local_dir = local_dir_;
-            const std::string destination = local_join_path(local_dir_, remote_cache_filename(transfer_config, entry));
-            transfer_remote_file(*remote_, entry, transfer_config, destination, ctx, status_, "正在下载到本机当前目录");
-            local_loaded_ = false;
+            const std::string local_name = remote_cache_filename(transfer_config, entry);
+            const std::string destination = local_join_path(local_dir_, local_name);
+            if (transfer_remote_file(*remote_, entry, transfer_config, destination, ctx, status_, "正在下载到本机当前目录")) {
+                const std::string completed = status_;
+                refresh_local();
+                const bool listed = std::any_of(local_entries_.begin(), local_entries_.end(),
+                    [&](const LocalEntry& item) { return item.path == destination; });
+                if (!local_path_exists(destination) || !listed) {
+                    status_ = "下载写入后本机目录回读未发现文件：" + destination;
+                    append_debug_log("下载后本机目录回读失败", destination);
+                } else {
+                    status_ = completed;
+                    if (local_name != entry.name)
+                        status_ += "；原名过长或含本机不兼容字符，已保存为：" + local_name;
+                    status_ += "；保存位置：" + destination;
+                }
+            } else {
+                local_loaded_ = false;
+            }
             break;
         }
         case RemoteFileAction::Install:

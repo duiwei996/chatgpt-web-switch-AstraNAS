@@ -25,6 +25,19 @@ grep -q 'NcmContentMetaType_DataPatch' source/installed/content_manager.cpp
 grep -q '卸载升级包' source/app/runtime_library.cpp
 grep -q '卸载全部 DLC' source/app/runtime_library.cpp
 grep -q '管理 DLC' source/app/runtime_library.cpp
+grep -q 'entry.dlc_count' source/app/runtime_library.cpp
+grep -q 'if (entry.patch_version)' source/app/runtime_library.cpp
+grep -q 'if (entry.dlc_count)' source/app/runtime_library.cpp
+grep -q 'dlc_count' source/installed/catalog.hpp source/installed/catalog.cpp source/ui/pages.cpp
+grep -q 'NcmContentMetaType_AddOnContent' source/installed/catalog.cpp
+grep -q 'nsextInitialize' source/app/runtime_services.cpp
+grep -q 'nsextExit' source/app/runtime.cpp
+grep -q 'http_context' source/app/util.cpp
+grep -q '下载写入后本机目录回读未发现文件' source/app/runtime_files.cpp
+grep -q 'shorten_utf8_middle' source/download_cache.cpp
+grep -q 'kSwitchPathBudget = 0x300' source/download_cache.cpp
+grep -q 'hierarchical SHA-256' source/atmo_xl/source/install/install_parts/install_part_03.inc
+grep -q '0x001fd602 / 2002-4075' source/atmo_xl/source/install/install_parts/install_part_03.inc
 grep -q '卸载全部游戏内容' source/app/runtime_library.cpp
 grep -q 'kVisibleRows=5' source/ui/dialogs.cpp
 grep -q 'registered_audit=\[%s\]' source/atmo_xl/source/install/install_parts/install_part_03.inc
@@ -101,7 +114,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == '9eeda814367ba0b6989b261420c897a4deb73ccc'" .github/workflows/build-nro.yml
+grep -q "github.event.before == '3ed7ff41030db1b1ea9054fb6fcbdee446ed5563'" .github/workflows/build-nro.yml
+! grep -q '9eeda814367ba0b6989b261420c897a4deb73ccc' .github/workflows/build-nro.yml
 ! grep -q 'c5fd847f6ff3902dbc14b67960575dcf863ed587' .github/workflows/build-nro.yml
 ! grep -q '1b7dca93859f6762a1d97618192d8e46abaace00' .github/workflows/build-nro.yml
 ! grep -q 'b6b8b820a8846e021e9a8f5fca194339c47b1cc8' .github/workflows/build-nro.yml
