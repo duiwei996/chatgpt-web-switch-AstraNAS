@@ -34,8 +34,16 @@ grep -q 'nsextInitialize' source/app/runtime_services.cpp
 grep -q 'nsextExit' source/app/runtime.cpp
 grep -q 'http_context' source/app/util.cpp
 grep -q '下载写入后本机目录回读未发现文件' source/app/runtime_files.cpp
-grep -q 'shorten_utf8_middle' source/download_cache.cpp
-grep -q 'kSwitchPathBudget = 0x300' source/download_cache.cpp
+! grep -q 'shorten_utf8_middle' source/download_cache.cpp
+! grep -q 'kMaxVisibleNameBytes\|kSwitchPathBudget' source/download_cache.cpp
+grep -q 'name == ".astranas-transfer"' source/download_cache.cpp
+grep -q 'local_join_path(parent, ".astranas-transfer")' source/app/action_transfer.cpp
+grep -q 'object_key + ".part"' source/app/action_transfer.cpp
+grep -q 'object_key + ".meta"' source/app/action_transfer.cpp
+! grep -q 'destination + ".astranas-part"' source/app/action_transfer.cpp
+grep -q '本机文件系统拒绝原始文件名/路径过长' source/app/action_transfer.cpp
+grep -q 'is_transfer_sidecar_name(entry.name)' source/app/runtime_services.cpp
+grep -q 'local_join_path(parent, ".astranas-transfer")' source/local_fs.cpp
 grep -q 'hierarchical SHA-256' source/atmo_xl/source/install/install_parts/install_part_03.inc
 grep -q '0x001fd602 / 2002-4075' source/atmo_xl/source/install/install_parts/install_part_03.inc
 grep -q '卸载全部游戏内容' source/app/runtime_library.cpp
@@ -114,7 +122,8 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == '3ed7ff41030db1b1ea9054fb6fcbdee446ed5563'" .github/workflows/build-nro.yml
+grep -q "github.event.before == 'e00a1ca673ed4adffd4a04474c21a48a16fe6d45'" .github/workflows/build-nro.yml
+! grep -q '3ed7ff41030db1b1ea9054fb6fcbdee446ed5563' .github/workflows/build-nro.yml
 ! grep -q '9eeda814367ba0b6989b261420c897a4deb73ccc' .github/workflows/build-nro.yml
 ! grep -q 'c5fd847f6ff3902dbc14b67960575dcf863ed587' .github/workflows/build-nro.yml
 ! grep -q '1b7dca93859f6762a1d97618192d8e46abaace00' .github/workflows/build-nro.yml

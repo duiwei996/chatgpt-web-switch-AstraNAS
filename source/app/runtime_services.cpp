@@ -150,7 +150,7 @@ void Runtime::refresh_local() {
     std::string error;
     local_entries_.clear();
     if (!list_local_dir(local_dir_, local_entries_, error)) status_ = friendly_error("读取本机目录失败", error);
-    else local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(), [](const auto& entry) { return !entry.is_dir && is_transfer_sidecar_name(entry.name); }), local_entries_.end());
+    else local_entries_.erase(std::remove_if(local_entries_.begin(), local_entries_.end(), [](const auto& entry) { return is_transfer_sidecar_name(entry.name); }), local_entries_.end());
     local_selection_.erase(std::remove_if(local_selection_.begin(), local_selection_.end(), [](const std::string& path) { return !local_path_exists(path); }), local_selection_.end());
     persist_local_state();
     local_loaded_ = true;
@@ -159,7 +159,7 @@ void Runtime::refresh_cache() {
     std::string error;
     cache_entries_.clear();
     if (!list_local_dir(config_.cache_dir, cache_entries_, error)) status_ = friendly_error("读取安装缓存失败", error);
-    else cache_entries_.erase(std::remove_if(cache_entries_.begin(), cache_entries_.end(), [](const auto& entry) { return !entry.is_dir && is_transfer_sidecar_name(entry.name); }), cache_entries_.end());
+    else cache_entries_.erase(std::remove_if(cache_entries_.begin(), cache_entries_.end(), [](const auto& entry) { return is_transfer_sidecar_name(entry.name); }), cache_entries_.end());
     cache_loaded_ = true;
 }
 void Runtime::load_installed_cache() {

@@ -55,16 +55,16 @@ int main() {
     for (int i = 0; i < 100; ++i) entry.name += "中";
     entry.name += ".nsp";
     const std::string long_chinese = remote_cache_filename(config, entry);
-    assert(long_chinese.size() <= 180);
+    assert(long_chinese == entry.name);
+    assert(long_chinese.size() > 180);
     assert(long_chinese.size() >= 4);
     assert(long_chinese.compare(long_chinese.size() - 4, 4, ".nsp") == 0);
-    assert(long_chinese.find('~') != std::string::npos);
+    assert(long_chinese.find('~') == std::string::npos);
     assert(valid_utf8(long_chinese));
 
     config.local_dir = "sdmc:/" + std::string(650, 'd');
     const std::string deep_name = remote_cache_filename(config, entry);
-    assert(config.local_dir.size() + 1 + deep_name.size() + sizeof(".astranas-meta.new") - 1 <= 0x300);
-    assert(deep_name.size() >= 4);
+    assert(deep_name == entry.name);
     assert(valid_utf8(deep_name));
     config.local_dir = "sdmc:/";
 

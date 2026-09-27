@@ -1,8 +1,17 @@
-# AstraNAS v1.1.2
+# AstraNAS v1.1.3
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
 主程序要求通过 hbmenu **完整应用模式**运行；LibraryApplet/Applet 模式会提示后退出。当前兼容基线为 **Atmosphère 1.9.5 + HOS 20.5.0**。
+
+## v1.1.3 原始文件名直写与传输状态隔离
+
+- 移除 v1.1.2 为内部 sidecar 预留空间而加入的 180 字节可见文件名限制和中间截断；合法 UTF-8 的 NAS 文件名现在完整保留，不因 AstraNAS 自身状态文件而缩短。
+- 断点续传临时数据从 `原文件名.astranas-part/.astranas-meta` 改为当前目标目录下独立的 `.astranas-transfer/<object-key>.part/.meta`；内部 object key 与用户可见文件名彻底解耦。
+- 同名覆盖改为“先完整下载到内部状态目录，校验完成后再删除旧目标并原子发布”，避免下载过程中提前删除已有同名文件。
+- 最终发布只尝试 NAS 原始可表示名称；若本机 FS 真正返回 `ENAMETOOLONG` 或 `EILSEQ`，直接报告真实目标路径，不再私自生成短名或随机名。
+- 本机/缓存浏览器隐藏 `.astranas-transfer` 内部目录，同时继续兼容隐藏并清理旧版本遗留的 `.astranas-part/.astranas-meta` sidecar。
+- 本机复制/跨存储移动也不再给目标用户文件名追加 `.astranas-part`，统一在目标目录内部状态目录暂存。
 
 ## v1.1.2 动态已安装内容、DLC 管理初始化与本机下载可见性修复
 

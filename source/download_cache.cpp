@@ -76,46 +76,6 @@ std::string sanitize_filename(const std::string& value) {
     return out;
 }
 
-std::size_t utf8_prefix_bytes(const std::string& value, std::size_t max_bytes) {
-    std::size_t i = 0;
-    std::size_t accepted = 0;
-    while (i < value.size() && i < max_bytes) {
-        const unsigned char c0 = static_cast<unsigned char>(value[i]);
-        std::size_t width = 1;
-        if (c0 < 0x80) width = 1;
-        else if (c0 >= 0xC2 && c0 <= 0xDF) width = 2;
-        else if (c0 >= 0xE0 && c0 <= 0xEF) width = 3;
-        else if (c0 >= 0xF0 && c0 <= 0xF4) width = 4;
-        else break;
-        if (i + width > value.size() || i + width > max_bytes) break;
-        accepted = i + width;
-        i += width;
-    }
-    return accepted;
-}
-
-std::size_t utf8_suffix_start(const std::string& value, std::size_t max_bytes) {
-    if (value.size() <= max_bytes) return 0;
-    std::size_t start = value.size() - max_bytes;
-    while (start < value.size() &&
-           is_utf8_continuation(static_cast<unsigned char>(value[start]))) ++start;
-    return start;
-}
-
-std::string shorten_utf8_middle(const std::string& value, std::size_t max_bytes) {
-    if (value.size() <= max_bytes) return value;
-    if (max_bytes <= 1) return value.substr(0, utf8_prefix_bytes(value, max_bytes));
-    constexpr char marker = '~';
-    const std::size_t payload = max_bytes - 1;
-    const std::size_t left_budget = (payload + 1) / 2;
-    const std::size_t right_budget = payload - left_budget;
-    const std::size_t left_end = utf8_prefix_bytes(value, left_budget);
-    const std::size_t right_start = utf8_suffix_start(value, right_budget);
-    if (left_end == 0 || right_start <= left_end)
-        return value.substr(0, utf8_prefix_bytes(value, max_bytes));
-    return value.substr(0, left_end) + marker + value.substr(right_start);
-}
-
 bool sync_file(std::FILE* file) {
     if (std::fflush(file) != 0) return false;
 #ifdef _WIN32
@@ -132,37 +92,12 @@ std::string remote_object_key(const AppConfig& config, const RemoteDirEntry& ent
     return sha256_bytes(material.data(), material.size());
 }
 
-std::string remote_cache_filename(const AppConfig& config, const RemoteDirEntry& entry) {
-    // Keep the exact NAS filename whenever it safely fits. If a component or the
-    // complete Switch path would be too long, shorten the middle deterministically
-    // (never append a random/object hash) and keep the extension.
-    std::string name = sanitize_filename(basename_of(entry.name));
-    const auto dot = name.find_last_of('.');
-    std::string stem = dot == std::string::npos ? name : name.substr(0, dot);
-    std::string extension = dot == std::string::npos ? std::string{} : name.substr(dot);
-
-    constexpr std::size_t kMaxVisibleNameBytes = 180;
-    constexpr std::size_t kSwitchPathBudget = 0x300;
-    constexpr std::size_t kLongestSidecarSuffix = sizeof(".astranas-meta.new") - 1;
-    std::size_t nameLimit = kMaxVisibleNameBytes;
-    if (!config.local_dir.empty()) {
-        const std::size_t separator = config.local_dir.back() == '/' ? 0 : 1;
-        const std::size_t fixed = config.local_dir.size() + separator + kLongestSidecarSuffix;
-        if (fixed < kSwitchPathBudget)
-            nameLimit = std::min(nameLimit, kSwitchPathBudget - fixed);
-        else
-            nameLimit = 8;
-    }
-
-    if (extension.size() >= nameLimit) extension.clear();
-    const std::size_t stemLimit = nameLimit > extension.size() ? nameLimit - extension.size() : 0;
-    stem = shorten_utf8_middle(stem, stemLimit);
-    if (stem.empty()) stem = "download";
-    if (stem.size() + extension.size() > nameLimit)
-        extension.clear();
-    return stem + extension;
+std::string remote_cache_filename(const AppConfig&, const RemoteDirEntry& entry) {
+    // Keep the NAS-visible name exactly whenever it is representable on the local
+    // filesystem. Do not shorten it to make room for AstraNAS bookkeeping files;
+    // transfer state lives in a separate internal directory.
+    return sanitize_filename(basename_of(entry.name));
 }
-
 bool read_transfer_metadata(const std::string& path, TransferMetadata& metadata) {
     metadata = TransferMetadata{};
     std::FILE* file = std::fopen(path.c_str(), "rb");
@@ -215,6 +150,7 @@ bool is_transfer_sidecar_name(const std::string& name) {
         const std::size_t length = std::strlen(suffix);
         return name.size() >= length && name.compare(name.size() - length, length, suffix) == 0;
     };
-    return ends_with(".astranas-part") || ends_with(".astranas-meta") ||
+    return name == ".astranas-transfer" ||
+           ends_with(".astranas-part") || ends_with(".astranas-meta") ||
            ends_with(".astranas-meta.new");
 }

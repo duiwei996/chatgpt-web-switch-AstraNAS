@@ -52,6 +52,30 @@ std::string lower_path(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
+
+std::string local_parent_path(const std::string& path) {
+    const auto slash = path.find_last_of('/');
+    if (slash == std::string::npos) return {};
+    if (slash == 0) return "/";
+    if (slash + 1 == path.size()) return path.substr(0, slash);
+    return path.substr(0, slash);
+}
+
+struct TransferStatePaths {
+    std::string directory;
+    std::string partial;
+    std::string metadata;
+};
+
+TransferStatePaths transfer_state_paths(const std::string& destination,
+                                        const std::string& object_key) {
+    const std::string parent = local_parent_path(destination);
+    TransferStatePaths paths;
+    paths.directory = local_join_path(parent, ".astranas-transfer");
+    paths.partial = local_join_path(paths.directory, object_key + ".part");
+    paths.metadata = local_join_path(paths.directory, object_key + ".meta");
+    return paths;
+}
 const char* package_extension(PackageContainerKind kind) {
     switch (kind) {
         case PackageContainerKind::Nsp: return ".nsp";
@@ -203,19 +227,13 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
     }
 
     const std::string object_key = remote_object_key(config, entry);
-    const std::string partial = destination + ".astranas-part";
-    const std::string partial_meta_path = partial + ".astranas-meta";
-    const std::string final_meta_path = destination + ".astranas-meta";
-    if (local_path_exists(destination)) {
-        // User requested original-name semantics: an explicit download of the same
-        // NAS filename replaces the visible local file instead of inventing a hash name.
-        if (std::remove(destination.c_str()) != 0) {
-            status = friendly_error("无法覆盖本机同名文件 " + basename_of(destination), std::strerror(errno));
-            return false;
-        }
-        std::remove(final_meta_path.c_str());
-        append_debug_log("覆盖本机同名文件", destination);
+    const TransferStatePaths state = transfer_state_paths(destination, object_key);
+    if (!local_mkdir_p(state.directory)) {
+        status = "无法创建内部断点续传目录：" + state.directory;
+        return false;
     }
+    const std::string& partial = state.partial;
+    const std::string& partial_meta_path = state.metadata;
 
     TransferMetadata partial_metadata;
     if (!read_transfer_metadata(partial_meta_path, partial_metadata) || partial_metadata.object_key != object_key) {
@@ -292,15 +310,28 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
                     status = friendly_error("无法保存校验结果", metadata_error); return false;
                 }
             }
+            const bool replacing = local_path_exists(destination);
+            if (replacing && std::remove(destination.c_str()) != 0) {
+                status = friendly_error("无法覆盖本机同名文件 " + basename_of(destination), std::strerror(errno));
+                return false;
+            }
             if (std::rename(partial.c_str(), destination.c_str()) != 0) {
-                status = friendly_error("无法发布已完成的文件", std::strerror(errno)); return false;
+                const int publish_errno = errno;
+                if (publish_errno == ENAMETOOLONG) {
+                    status = "本机文件系统拒绝原始文件名/路径过长；AstraNAS 未改名。目标：" + destination;
+                } else if (publish_errno == EILSEQ) {
+                    status = "本机文件系统拒绝该 UTF-8 文件名；AstraNAS 未改名。目标：" + destination;
+                } else {
+                    status = friendly_error("无法发布已完成的文件", std::strerror(publish_errno)) +
+                             "；目标：" + destination;
+                }
+                return false;
             }
-            std::remove(final_meta_path.c_str());
-            if (std::rename(partial_meta_path.c_str(), final_meta_path.c_str()) != 0) {
-                std::string metadata_error;
-                write_transfer_metadata(final_meta_path, partial_metadata, metadata_error);
-                if (!metadata_error.empty()) append_debug_log("补写传输信息", metadata_error);
-            }
+            std::remove(partial_meta_path.c_str());
+            // Remove legacy v1.0.x/v1.1.x sidecars if they exist next to the file.
+            std::remove((destination + ".astranas-meta").c_str());
+            (void)rmdir(state.directory.c_str());
+            if (replacing) append_debug_log("覆盖本机同名文件", destination);
             status = std::string(phase) + "完成：" + basename_of(destination) + "（" + format_size(final_size) + "）";
             return true;
         }

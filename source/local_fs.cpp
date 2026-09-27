@@ -191,7 +191,11 @@ bool copy_local_file(const std::string& source, const std::string& destination, 
     std::FILE* in = std::fopen(source.c_str(), "rb");
     if (!in) { error = "cannot open source"; return false; }
 
-    const std::string temporary = destination + ".astranas-part";
+    const auto slash = destination.find_last_of('/');
+    const std::string parent = slash == std::string::npos ? std::string{} : destination.substr(0, slash);
+    const std::string state_dir = local_join_path(parent, ".astranas-transfer");
+    if (!local_mkdir_p(state_dir)) { std::fclose(in); error = "cannot create internal transfer directory"; return false; }
+    const std::string temporary = local_join_path(state_dir, "local-copy.part");
     std::remove(temporary.c_str());
     std::FILE* out = std::fopen(temporary.c_str(), "wb");
     if (!out) { std::fclose(in); error = "cannot open temporary destination"; return false; }
@@ -216,6 +220,7 @@ bool copy_local_file(const std::string& source, const std::string& destination, 
         std::remove(temporary.c_str());
         return false;
     }
+    (void)rmdir(state_dir.c_str());
     return true;
 }
 
