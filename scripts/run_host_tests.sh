@@ -122,7 +122,11 @@ grep -q '上传最近安装日志' source/app/runtime_library.cpp
 grep -q '上传最近测速日志' "${netdiag_sources[@]}"
 grep -q 'workflow_dispatch:' .github/workflows/build-nro.yml .github/workflows/build-nro-self-hosted.yml
 grep -Eq '^[[:space:]]+push:' .github/workflows/build-nro.yml
-grep -q "github.event.before == 'b7bdc041208a2477132532a332c052d04b0cf7b0'" .github/workflows/build-nro.yml
+! grep -q 'github.event.before' .github/workflows/build-nro.yml
+grep -q "if: github.event_name == 'push' && github.ref == 'refs/heads/main'" .github/workflows/build-nro.yml
+grep -q 'contents: write' .github/workflows/build-nro.yml
+grep -q 'gh release create' .github/workflows/build-nro.yml
+! grep -q 'cancel-in-progress: true' .github/workflows/build-nro.yml
 ! grep -q '3ed7ff41030db1b1ea9054fb6fcbdee446ed5563' .github/workflows/build-nro.yml
 ! grep -q '9eeda814367ba0b6989b261420c897a4deb73ccc' .github/workflows/build-nro.yml
 ! grep -q 'c5fd847f6ff3902dbc14b67960575dcf863ed587' .github/workflows/build-nro.yml
@@ -134,7 +138,6 @@ grep -q "github.event.before == 'b7bdc041208a2477132532a332c052d04b0cf7b0'" .git
 ! grep -q 'd3e2c76b97d86c6578386fccddf212dcfb88ff05' .github/workflows/build-nro.yml
 ! grep -q '44c7d5cf4f3ad4b804517539c2f5c6bef0bc6a5d' .github/workflows/build-nro.yml
 ! grep -q 'e537cc9437f436bf81ec384fd825dd82d8704094' .github/workflows/build-nro.yml
-! grep -Eq '^[[:space:]]+pull_request:' .github/workflows/build-nro.yml
 ! grep -Eq '^[[:space:]]+(push|pull_request):' .github/workflows/build-nro-self-hosted.yml
 grep -q 'InstallAndReadCnmtWithRepair' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install_nsp.cpp source/atmo_xl/source/install/install_xci.cpp
 grep -q 'ReinstallNcaTracked' source/atmo_xl/include/install/install.hpp source/atmo_xl/source/install/install_parts/install_part_03.inc

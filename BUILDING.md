@@ -72,6 +72,10 @@ sha256: af4ec72ba7c20b7aedc79f5d63bffa842e2665e740a878cc78c13d34051791b9
 
 GitHub Actions 还会用 `actions/cache` 保存同一压缩包，因此同一工具链 revision 的后续构建通常不需要再次下载。工具链、libsmb2 或 libusbhsfs 版本变化时，应在 DownloadBridge 中发布新的 revision/tag，而不是覆盖旧 revision。
 
+GitHub-hosted workflow 在每次推送到 `main` 时自动运行 host-test 与 NRO 构建。只有 `main` 推送且检查、构建、Artifact 校验全部成功时，发布 job 才按项目版本创建 `v<版本号>` tag 和 GitHub Release，并附上两个 NRO、完整源码包、配置示例及校验清单。tag 已存在时发布失败并保留旧 Release，不会覆盖。
+
+因此每次推送到 `main` 都必须递增一个语义版本，并同步 CMake、运行时常量、workflow、README 和配置示例。一次 push 包含多个提交时，Actions 构建该 push 的最终提交。不同推送不会互相取消。`workflow_dispatch` 手动构建仅上传临时 Artifact，不创建 Release。Self-hosted workflow 仍只用于手动构建。
+
 ## 构建
 
 ```bash
@@ -119,6 +123,7 @@ checkout 当前源码 + submodule
 -> 生成 SHA256SUMS.txt / BUILD-MANIFEST.txt
 -> 校验 NRO0 / ZIP / SHA-256
 -> 上传 Artifact
+-> 若为 main push：校验无重复 tag 后创建版本 tag / Release，并附上构建产物
 ```
 
 最终发布 Artifact 应包含：

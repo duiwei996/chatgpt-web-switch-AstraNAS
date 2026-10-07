@@ -1,5 +1,9 @@
 # AstraNAS 更新记录
 
+## v1.1.17
+
+- GitHub-hosted Actions 在 main 推送后自动运行回归检查和 NRO 构建；全部通过后由发布 job 自动创建版本 tag 和 GitHub Release。手动构建不发布。
+
 ## v1.1.16
 
 - 修正 NCZ 分区表校验边界：`0x4000` 是 NCZ 保留的未压缩前缀长度，不是分区起始下限；合法分区可从 NCA 加密头结束处 `0xC00` 开始。保留 NCA 总大小边界和分区重叠校验。

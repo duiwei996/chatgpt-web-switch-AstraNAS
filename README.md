@@ -1,4 +1,4 @@
-# AstraNAS v1.1.16
+# AstraNAS v1.1.17
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
@@ -9,6 +9,12 @@ AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可�
 - 旧环境 **Atmosphère 1.9.5 + HOS 20.5.0** 下，部分包安装时出现 `0x001fd602 / 2002-4075`，失败点为 Horizon 挂载已注册 CNMT NCA 文件系统；当时源文件与注册后文件的完整 SHA-256 一致。
 - 同类问题在更新到 **Atmosphère 1.12.0 + HOS 23.0.0** 后，用户报告相关文件可以安装。这个结果说明旧错误不能仅凭错误码归因于包损坏或传输损坏；更可能与旧版系统/Atmosphère/相关补丁的兼容状态有关。
 - 具体由哪个系统组件或补丁差异触发尚未确认，因此这里只记录为现场观察和兼容性推断，不作为通用升级建议。它与 AstraNAS 在安装流中报出的 `invalid or overlapping NCZ section` 属于不同阶段的问题。
+
+## v1.1.17 自动构建与发布
+
+- GitHub-hosted workflow 会在每次 `main` 推送时运行 host-test 与 NRO 构建。
+- 每次 `main` 推送的构建与校验通过后，发布 job 按项目版本创建 `v<版本号>` tag 和 GitHub Release，并附上 NRO、源码包与校验清单。每次推送都必须递增项目语义版本；重复版本 tag 会使发布失败，不会覆盖旧版本。
+- 手动触发只构建并上传短期 Actions Artifact，不创建 tag 或 Release。
 
 ## v1.1.16 NCZ 分区边界兼容性修复
 
@@ -305,7 +311,7 @@ sdmc:/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro
 
 ## 构建
 
-两个正式 GitHub Actions workflow 默认都使用 `workflow_dispatch` 手动触发。为完成本次已授权的 v1.1.1 主分支修复交付，GitHub-hosted workflow 保留一个只匹配“v1.1.0 提交 → v1.1.1”这一次迁移的 push 门禁；该提交完成后，后续 main push 不会自动运行。self-hosted workflow 始终仅手动触发。
+GitHub-hosted workflow 会在每次 `main` 推送时运行 host-test 与 NRO 构建。`main` 推送只有在所有检查与构建成功后，才由同一 workflow 创建版本 tag 和 GitHub Release。项目每次 `main` 推送必须递增语义版本，以保证 tag 唯一。手动触发只上传临时 Artifact，不创建 Release。Self-hosted workflow 仍仅供手动构建。
 
 本地 devkitPro：
 

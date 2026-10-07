@@ -2,21 +2,14 @@ name: Build AstraNAS NRO
 
 on:
   workflow_dispatch:
-  # Use workflow_dispatch for v1.1.16. The push guard below remains pinned to
-  # the historical one-shot v1.1.15 transition.
   push:
     branches:
       - main
-
-concurrency:
-  group: astranas-manual-build
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 env:
-  ASTRANAS_VERSION: "1.1.16"
+  ASTRANAS_VERSION: "1.1.17"
   LIBSMB2_COMMIT: "0b2aa4310c7a0510c666fe7da0eebce0f7e93824"
   LIBUSBHSFS_COMMIT: "3b897ed6a79c910aa3f13693f17b80afb802b3b5"
   TOOLCHAIN_BRIDGE_REPO: "duiwei996/chatgpt-web-github-actions-DownloadBridge"
@@ -25,7 +18,6 @@ env:
 
 jobs:
   host-test:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == 'b7bdc041208a2477132532a332c052d04b0cf7b0')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -38,7 +30,6 @@ jobs:
         run: ./scripts/run_host_tests.sh
 
   build:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == 'b7bdc041208a2477132532a332c052d04b0cf7b0')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -86,3 +77,53 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 1
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [host-test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download and verify build artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          artifact_name="AstraNAS-v${ASTRANAS_VERSION}-${GITHUB_SHA}"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact_name" --dir release-assets
+          cd release-assets
+          sha256sum --check SHA256SUMS.txt
+          sha256sum --check NRO-SHA256SUMS.txt
+
+      - name: Create version tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_tag="v${ASTRANAS_VERSION}"
+          set +e
+          git ls-remote --exit-code --refs "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${release_tag}" >/dev/null 2>&1
+          tag_status=$?
+          set -e
+          if [[ "$tag_status" -eq 0 ]]; then
+            echo "Refusing to reuse existing tag ${release_tag}." >&2
+            exit 1
+          elif [[ "$tag_status" -ne 2 ]]; then
+            echo "Unable to verify whether tag ${release_tag} already exists." >&2
+            exit "$tag_status"
+          fi
+
+          gh release create "$release_tag" \
+            "release-assets/switch/AstraNAS/AstraNAS.nro" \
+            "release-assets/switch/AstraNAS-NetDiag/AstraNAS-NetDiag.nro" \
+            "release-assets/AstraNAS-source.zip" \
+            "release-assets/config.example.ini" \
+            "release-assets/BUILD-MANIFEST.txt" \
+            "release-assets/NRO-SHA256SUMS.txt" \
+            "release-assets/SHA256SUMS.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AstraNAS ${release_tag}" \
+            --generate-notes

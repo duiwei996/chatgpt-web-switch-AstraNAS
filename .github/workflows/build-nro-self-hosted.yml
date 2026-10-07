@@ -10,9 +10,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  ASTRANAS_VERSION: "1.1.12"
-
 jobs:
   build-self-hosted:
     if: github.repository == 'duiwei996/chatgpt-web-switch-AstraNAS' && github.actor == 'duiwei996'
@@ -23,6 +20,12 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
+      - name: Read project version
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^project(astranas VERSION \([^ ]*\) LANGUAGES C CXX).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          echo "ASTRANAS_VERSION=$version" >> "$GITHUB_ENV"
       - name: Verify version
         run: python3 scripts/check_version.py --require-parent-bump --initial-version 1.0.0
       - name: Build with local/pinned toolchain
