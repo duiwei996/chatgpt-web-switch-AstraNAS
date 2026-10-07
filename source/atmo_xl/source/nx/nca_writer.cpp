@@ -41,6 +41,9 @@ namespace {
 
 constexpr u64 kNczSectionMagic = 0x4E544345535A434EULL; // "NCZSECTN"
 constexpr u64 kNczBlockMagic = 0x4B434F4C425A434EULL;   // "NCZBLOCK"
+// NCZ section ranges may begin at the 0xC00 crypto-header boundary even though
+// the stream preserves a 0x4000-byte prefix from the original NCA.
+constexpr u64 kNcaCryptoHeaderSize = sizeof(tin::install::NcaHeader);
 // BKTR update NCAs can legitimately expand to thousands of NCZ crypto sections.
 constexpr u64 kMaxNczSections = 0xFFFFULL;
 // Bound the table allocation itself instead of imposing an arbitrary block-count
@@ -211,11 +214,11 @@ private:
         if (m_pending.size() < headerSize) return false;
 
         m_sections.reserve(static_cast<std::size_t>(count));
-        u64 previousEnd = NCA_HEADER_SIZE;
+        u64 previousEnd = kNcaCryptoHeaderSize;
         for (u64 i = 0; i < count; ++i) {
             NczSection section{};
             std::memcpy(&section, m_pending.data() + 16 + i * sizeof(NczSection), sizeof(section));
-            if (section.offset < NCA_HEADER_SIZE || section.size == 0 ||
+            if (section.offset < kNcaCryptoHeaderSize || section.size == 0 ||
                 section.offset > m_expectedSize || section.size > m_expectedSize - section.offset ||
                 section.offset < previousEnd)
                 THROW_FORMAT("invalid or overlapping NCZ section");

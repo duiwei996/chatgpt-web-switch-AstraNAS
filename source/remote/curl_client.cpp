@@ -332,7 +332,7 @@ void CurlRemoteClient::apply_common(void* curl_handle) const {
     // transport buffer request, not the 8 MiB install ring; callback granularity is
     // measured separately by NetDiag because libcurl may still deliver smaller chunks.
     curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 1024L * 1024L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "AstraNAS/1.1.15");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "AstraNAS/1.1.16");
     if (!config_.username.empty()) curl_easy_setopt(curl, CURLOPT_USERNAME, config_.username.c_str());
     if (!config_.password.empty()) curl_easy_setopt(curl, CURLOPT_PASSWORD, config_.password.c_str());
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, config_.tls_verify ? 1L : 0L);

@@ -2,8 +2,8 @@ name: Build AstraNAS NRO
 
 on:
   workflow_dispatch:
-  # One-shot authorized v1.1.15 delivery build. The job guard below only accepts
-  # the transition from the v1.1.14 commit, so later main pushes stay manual.
+  # Use workflow_dispatch for v1.1.16. The push guard below remains pinned to
+  # the historical one-shot v1.1.15 transition.
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  ASTRANAS_VERSION: "1.1.15"
+  ASTRANAS_VERSION: "1.1.16"
   LIBSMB2_COMMIT: "0b2aa4310c7a0510c666fe7da0eebce0f7e93824"
   LIBUSBHSFS_COMMIT: "3b897ed6a79c910aa3f13693f17b80afb802b3b5"
   TOOLCHAIN_BRIDGE_REPO: "duiwei996/chatgpt-web-github-actions-DownloadBridge"
