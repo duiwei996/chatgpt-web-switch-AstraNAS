@@ -145,7 +145,9 @@ void write_synthetic_pfs0(const std::string& path, bool compressed = false) {
     out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 }
 
-void write_synthetic_xci(const std::string& path) {
+void write_synthetic_xci(const std::string& path,
+                         std::uint64_t declared_secure_size = 0,
+                         std::size_t truncate_bytes = 0) {
     const std::string root_strings = std::string("secure\0", 7);
     const std::string secure_strings = std::string("bundle.cert\0", 12);
     const std::size_t base = 0xF000;
@@ -155,7 +157,8 @@ void write_synthetic_xci(const std::string& path) {
     bytes[base+0]='H'; bytes[base+1]='F'; bytes[base+2]='S'; bytes[base+3]='0';
     put_le32(bytes, base + 4, 1);
     put_le32(bytes, base + 8, static_cast<std::uint32_t>(root_strings.size()));
-    put_le32(bytes, base + 0x10 + 8, static_cast<std::uint32_t>(secure_size));
+    put_le32(bytes, base + 0x10 + 8, static_cast<std::uint32_t>(
+        declared_secure_size ? declared_secure_size : secure_size));
     put_le32(bytes, base + 0x10 + 16, 0);
     std::copy(root_strings.begin(), root_strings.end(), bytes.begin() + base + 0x10 + 0x40);
 
@@ -164,6 +167,7 @@ void write_synthetic_xci(const std::string& path) {
     put_le32(bytes, root_data + 8, static_cast<std::uint32_t>(secure_strings.size()));
     put_le32(bytes, root_data + 0x10 + 16, 0);
     std::copy(secure_strings.begin(), secure_strings.end(), bytes.begin() + root_data + 0x10 + 0x40);
+    if (truncate_bytes) bytes.resize(bytes.size() - truncate_bytes);
     std::ofstream out(path, std::ios::binary);
     out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 }
@@ -505,6 +509,34 @@ int main() {
         assert(archive.suffix(".cert").size() == 1);
     }
     std::remove(xci_path.c_str());
+
+    // An XCZ outer HFS0 may declare an aligned length without writing
+    // the final padding; only the last root entry may use that allowance.
+    const std::string xcz_path = "/tmp/Aligned.xcz";
+    write_synthetic_xci(xcz_path, 0x200);
+    PackageInspection xcz_info;
+    assert(inspect_package_file(xcz_path, xcz_info, error));
+    assert(xcz_info.kind == PackageContainerKind::Xcz);
+    assert(xcz_info.file_count == 1);
+    std::remove(xcz_path.c_str());
+
+    // XCI is strict; overlong padding or truncated secure tables also fail.
+    const std::string strict_xci_path = "/tmp/Padded.xci";
+    write_synthetic_xci(strict_xci_path, 0x200);
+    PackageInspection strict_info;
+    assert(!inspect_package_file(strict_xci_path, strict_info, error));
+    assert(error.find("end past EOF") != std::string::npos);
+    std::remove(strict_xci_path.c_str());
+
+    write_synthetic_xci(xcz_path, 0x400);
+    assert(!inspect_package_file(xcz_path, xcz_info, error));
+    assert(error.find("end past EOF") != std::string::npos);
+    std::remove(xcz_path.c_str());
+
+    write_synthetic_xci(xcz_path, 0x200, 1);
+    assert(!inspect_package_file(xcz_path, xcz_info, error));
+    assert(error.find("truncated") != std::string::npos);
+    std::remove(xcz_path.c_str());
 
     const std::string nsz_path = "/tmp/game.nsz";
     write_synthetic_pfs0(nsz_path, true);

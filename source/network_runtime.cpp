@@ -36,6 +36,8 @@ std::string network_link_summary(const NetworkLinkInfo& info) {
 namespace {
 bool g_wireless_priority_optimized = false;
 unsigned int g_cpu_boost_refs = 0;
+unsigned int g_transfer_awake_refs = 0;
+bool g_auto_sleep_previously_disabled = false;
 }
 
 bool initialize_socket(SocketProfile profile, std::string& error) {
@@ -93,6 +95,37 @@ NetworkLinkInfo query_network_link() {
     out.ethernet = type == NifmInternetConnectionType_Ethernet;
     out.wifi_strength = out.wifi ? strength : 0;
     return out;
+}
+
+ScopedTransferAwake::ScopedTransferAwake() {
+    if (g_transfer_awake_refs == 0) {
+        bool previously_disabled = false;
+        const Result query_rc = appletIsAutoSleepDisabled(&previously_disabled);
+        if (R_FAILED(query_rc)) {
+            std::ostringstream details;
+            details << "无法读取自动休眠状态 (0x" << std::hex << query_rc << ")";
+            error_ = details.str();
+            return;
+        }
+        if (!previously_disabled) {
+            const Result enable_rc = appletSetAutoSleepDisabled(true);
+            if (R_FAILED(enable_rc)) {
+                std::ostringstream details;
+                details << "无法禁止自动休眠 (0x" << std::hex << enable_rc << ")";
+                error_ = details.str();
+                return;
+            }
+        }
+        g_auto_sleep_previously_disabled = previously_disabled;
+    }
+    ++g_transfer_awake_refs;
+    enabled_ = true;
+}
+
+ScopedTransferAwake::~ScopedTransferAwake() {
+    if (!enabled_ || g_transfer_awake_refs == 0) return;
+    if (--g_transfer_awake_refs == 0 && !g_auto_sleep_previously_disabled)
+        (void)appletSetAutoSleepDisabled(false);
 }
 
 ScopedCpuBoost::ScopedCpuBoost(bool enable) {

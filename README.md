@@ -1,4 +1,4 @@
-# AstraNAS v1.1.17
+# AstraNAS v1.1.18
 
 AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可直接浏览 SMB / WebDAV、下载文件、安装受设备环境授权的内容、管理本机 SD/USB 文件，并提供独立的 `AstraNAS-NetDiag` 网络诊断程序。
 
@@ -9,6 +9,12 @@ AstraNAS 是面向 Nintendo Switch 的 NAS / 远程文件管理 Homebrew，可�
 - 旧环境 **Atmosphère 1.9.5 + HOS 20.5.0** 下，部分包安装时出现 `0x001fd602 / 2002-4075`，失败点为 Horizon 挂载已注册 CNMT NCA 文件系统；当时源文件与注册后文件的完整 SHA-256 一致。
 - 同类问题在更新到 **Atmosphère 1.12.0 + HOS 23.0.0** 后，用户报告相关文件可以安装。这个结果说明旧错误不能仅凭错误码归因于包损坏或传输损坏；更可能与旧版系统/Atmosphère/相关补丁的兼容状态有关。
 - 具体由哪个系统组件或补丁差异触发尚未确认，因此这里只记录为现场观察和兼容性推断，不作为通用升级建议。它与 AstraNAS 在安装流中报出的 `invalid or overlapping NCZ section` 属于不同阶段的问题。
+
+## v1.1.18 XCZ 容器兼容与传输防休眠
+
+- 修复部分 XCZ 的根 HFS0 最后一个分区仅声明 0x200 字节对齐尾部、但未实际写入填充时误报 `package entry is outside the file` 的问题。仅接受最后一个根分区最多 0x200 字节尾差；内部 secure/NCZ/NCA 文件内容与完整性检查不放宽。
+- 安装、下载与上传期间通过 libnx 临时阻止系统**自动休眠**，完成或失败后恢复原先状态。按电源键主动休眠仍可能断开 Wi-Fi，不提供真正的休眠后台传输。
+- 越界错误增加源长度与条目位置信息；休眠保护设置失败会写入运行日志以供排查。
 
 ## v1.1.17 自动构建与发布
 

@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstring>
 #include <limits>
+#include <sstream>
 #include <unordered_set>
 
 namespace astranas::title_backend {
@@ -35,7 +36,7 @@ std::string lower(std::string value) {
 
 bool PackageArchive::parse_table(PackageSource& source, std::uint64_t base,
                                  const char* magic, std::uint64_t entrySize,
-                                 std::string& error) {
+                                 std::string& error, bool allow_xcz_root_tail_padding) {
     if (base > source.size() || source.size() - base < 0x10) {
         error = "package table header is outside the file";
         return false;
@@ -83,15 +84,37 @@ bool PackageArchive::parse_table(PackageSource& source, std::uint64_t base,
     std::vector<PackageEntry> parsed;
     parsed.reserve(count);
     std::unordered_set<std::string> names;
+    // Some XCZ writers declare an aligned HFS0 root size without writing the
+    // final padding. This exception is only for the outermost, last partition.
+    std::int32_t padded_root_entry = -1;
+    const auto out_of_bounds = [&](std::uint32_t index, const char* reason,
+                                   std::uint64_t offset, std::uint64_t length,
+                                   std::uint32_t nameOffset) {
+        std::ostringstream details;
+        details << "package entry is outside the file (" << reason << ")"
+                << ": index=" << index << " table_base=" << base
+                << " data_base=" << dataBase << " source_size=" << source.size()
+                << " offset=" << offset << " size=" << length
+                << " name_offset=" << nameOffset;
+        error = details.str();
+        return false;
+    };
     for (std::uint32_t i = 0; i < count; ++i) {
         const auto* entry = raw.data() + static_cast<std::size_t>(i) * entrySize;
         const std::uint64_t offset = le64(entry);
         const std::uint64_t size = le64(entry + 8);
         const std::uint32_t nameOffset = le32(entry + 16);
-        if (nameOffset >= stringSize || offset > source.size() - dataBase ||
-            size > source.size() - dataBase - offset) {
-            error = "package entry is outside the file";
-            return false;
+        if (nameOffset >= stringSize)
+            return out_of_bounds(i, "invalid name offset", offset, size, nameOffset);
+        if (offset > source.size() - dataBase)
+            return out_of_bounds(i, "start past EOF", offset, size, nameOffset);
+        const std::uint64_t available = source.size() - dataBase - offset;
+        if (size > available) {
+            const std::uint64_t overhang = size - available;
+            if (!allow_xcz_root_tail_padding || padded_root_entry >= 0 ||
+                (size % 0x200u) != 0 || overhang > 0x200u)
+                return out_of_bounds(i, "end past EOF", offset, size, nameOffset);
+            padded_root_entry = static_cast<std::int32_t>(i);
         }
 
         const char* begin = strings.data() + nameOffset;
@@ -122,6 +145,11 @@ bool PackageArchive::parse_table(PackageSource& source, std::uint64_t base,
     std::sort(ordered.begin(), ordered.end(), [](const auto* lhs, const auto* rhs) {
         return lhs->offset < rhs->offset;
     });
+    if (padded_root_entry >= 0 &&
+        ordered.back() != &parsed[static_cast<std::size_t>(padded_root_entry)]) {
+        error = "XCZ root padding is not in the final partition";
+        return false;
+    }
     for (std::size_t i = 1; i < ordered.size(); ++i) {
         const auto* previous = ordered[i - 1];
         if (previous->size != 0 &&
@@ -145,7 +173,8 @@ bool PackageArchive::open(PackageSource& source, PackageContainerKind kind, std:
     }
 
     constexpr std::uint64_t kXciRootHfs0Offset = 0xF000;
-    if (!parse_table(source, kXciRootHfs0Offset, "HFS0", 0x40, error)) return false;
+    if (!parse_table(source, kXciRootHfs0Offset, "HFS0", 0x40, error,
+                     kind == PackageContainerKind::Xcz)) return false;
 
     const auto secure = std::find_if(entries_.begin(), entries_.end(), [](const PackageEntry& entry) {
         return lower(entry.name) == "secure";

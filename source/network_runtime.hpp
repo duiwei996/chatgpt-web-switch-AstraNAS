@@ -34,6 +34,22 @@ bool set_wireless_priority(bool optimized, std::string& error);
 bool wireless_priority_optimized();
 NetworkLinkInfo query_network_link();
 
+// Blocks system-initiated auto-sleep during active transfers. It cannot
+// prevent deliberate sleep via the Power button.
+class ScopedTransferAwake {
+public:
+    ScopedTransferAwake();
+    ~ScopedTransferAwake();
+    ScopedTransferAwake(const ScopedTransferAwake&) = delete;
+    ScopedTransferAwake& operator=(const ScopedTransferAwake&) = delete;
+    bool enabled() const { return enabled_; }
+    const std::string& error() const { return error_; }
+
+private:
+    bool enabled_ = false;
+    std::string error_;
+};
+
 class ScopedCpuBoost {
 public:
     explicit ScopedCpuBoost(bool enable = true);

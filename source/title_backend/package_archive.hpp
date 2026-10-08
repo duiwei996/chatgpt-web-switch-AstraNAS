@@ -13,7 +13,7 @@ public:
     const std::vector<PackageEntry>& entries() const { return entries_; }
     std::vector<const PackageEntry*> suffix(const std::string&) const;
 private:
-    bool parse_table(PackageSource&, std::uint64_t, const char*, std::uint64_t, std::string&);
+    bool parse_table(PackageSource&, std::uint64_t, const char*, std::uint64_t, std::string&, bool allow_xcz_root_tail_padding = false);
     std::vector<PackageEntry> entries_;
 };
 } // namespace astranas::title_backend

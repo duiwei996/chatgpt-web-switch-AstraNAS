@@ -212,6 +212,8 @@ bool transfer_remote_file(RemoteClient& remote, const RemoteDirEntry& entry, con
         status = "已阻止写入当前存储设备之外的位置";
         return false;
     }
+    astranas::network::ScopedTransferAwake keep_awake;
+    if (!keep_awake.enabled()) append_debug_log("下载自动休眠保护", keep_awake.error());
     const std::string destination_parent = local_parent_directory(destination);
     if (!destination_parent.empty() && !local_mkdir_p(destination_parent)) {
         status = "无法创建目标目录";
@@ -401,6 +403,8 @@ bool upload_local_file(RemoteClient& remote, const LocalEntry& entry, const AppC
         return false;
     }
 
+    astranas::network::ScopedTransferAwake keep_awake;
+    if (!keep_awake.enabled()) append_debug_log("上传自动休眠保护", keep_awake.error());
     const int max_attempts = std::max(1, config.download_retries + 1);
     for (int attempt = 1; attempt <= max_attempts; ++attempt) {
         const auto start_time = std::chrono::steady_clock::now();

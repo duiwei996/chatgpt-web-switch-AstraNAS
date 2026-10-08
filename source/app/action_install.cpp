@@ -221,6 +221,8 @@ InstallResult install_from_path(const std::string& source_path, AppConfig& confi
                                 bool notify_on_success) {
     const auto kind = detect_install_candidate(source_path);
     if (kind == InstallCandidateKind::None) { status = "所选项目不是可安装文件"; return InstallResult::Unsupported; }
+    astranas::network::ScopedTransferAwake keep_awake;
+    if (!keep_awake.enabled()) append_debug_log("本机安装自动休眠保护", keep_awake.error());
     PackageInspection inspection;
     std::string inspect_error;
     inspect_package_file(source_path, inspection, inspect_error);
@@ -283,6 +285,8 @@ InstallResult install_remote_entry(RemoteClient& remote, const RemoteDirEntry& e
                                    AppConfig& config, ActionContext& ctx,
                                    std::string& status, bool ask_confirmation,
                                    bool notify_on_success) {
+    astranas::network::ScopedTransferAwake keep_awake;
+    if (!keep_awake.enabled()) append_debug_log("网络安装自动休眠保护", keep_awake.error());
     const auto fallback_to_cache = [&]() -> InstallResult {
         std::string cached;
         if (!stage_remote_candidate(remote, entry, config, ctx, status, cached))
@@ -406,6 +410,8 @@ bool prepare_remote_install_queue(RemoteClient& remote,
 
     if (install_queue.empty()) { status = "安装队列为空"; return false; }
 
+    astranas::network::ScopedTransferAwake keep_awake;
+    if (!keep_awake.enabled()) append_debug_log("安装预解析自动休眠保护", keep_awake.error());
     const bool direct_install = config.network_direct_install;
     if (direct_install) {
         for (auto& queued : install_queue) {
